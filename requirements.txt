@@ -1,0 +1,8 @@
+torch
+torch_geometric
+rdkit
+scikit-learn
+numpy
+pandas
+git+https://github.com/KalininaLab/glyles.git
+glycowork
