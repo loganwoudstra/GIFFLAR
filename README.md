@@ -1,8 +1,8 @@
-# S³N
+# SweetSimplexNet
 
 ### Installation:
 ```bash
-conda create -n s3n python=3.11
-conda activate s3n
+conda create -n ssn python=3.11
+conda activate ssn
 pip install -r requirements.txt
 ```

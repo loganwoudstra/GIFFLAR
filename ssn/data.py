@@ -1,0 +1,244 @@
+import copy
+import pickle
+from pathlib import Path
+from typing import List, Union, Tuple, Optional
+
+import pandas as pd
+import torch
+from rdkit import Chem
+from torch.utils.data import DataLoader
+from torch_geometric.data import InMemoryDataset, HeteroData
+from pytorch_lightning import LightningDataModule
+from glycowork.glycan_data.loader import lib
+import glyles
+from glyles.glycans.factory.factory import MonomerFactory
+from tqdm import tqdm
+
+from ssn.utils import S3NMerger, nx2mol
+
+atom_map = {6: 0, 7: 1, 8: 2, 15: 3, 16: 4}
+bond_map = {1: 0, 1.5: 1, 2: 2, 3: 3}
+lib_map = {n: i for i, n in enumerate(lib)}
+
+
+def iupac2mol(iupac: str = "Fuc(a1-4)Gal(a1-4)Glc"):
+    glycan = glyles.Glycan(iupac)
+    # print(glycan.get_smiles())
+    tree = glycan.parse_tree
+    merged = S3NMerger(MonomerFactory()).merge(tree, glycan.root_orientation, glycan.start)
+    mol = nx2mol(merged)
+
+    data = HeteroData()
+    data["IUPAC"] = iupac
+    data["smiles"] = Chem.MolToSmiles(mol)
+    if len(data["smiles"]) < 10:
+        return None
+
+    data["atoms"].x = torch.tensor([atom_map.get(atom.GetAtomicNum(), len(atom_map)) for atom in mol.GetAtoms()])
+    data["atoms"].num_nodes = len(data["atoms"].x)
+    data["bonds"].x = []
+    data["atoms", "coboundary", "atoms"].edge_index = []
+    data["atoms", "to", "bonds"].edge_index = []
+    data["bonds", "to", "monosacchs"].edge_index = []
+    for bond in mol.GetBonds():
+        data["bonds"].x.append(bond_map.get(bond.GetBondTypeAsDouble(), len(bond_map)))
+        data["atoms", "coboundary", "atoms"].edge_index += [(bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()),
+                                                            (bond.GetEndAtomIdx(), bond.GetBeginAtomIdx())]
+        data["atoms", "to", "bonds"].edge_index += [(bond.GetBeginAtomIdx(), bond.GetIdx()),
+                                                    (bond.GetEndAtomIdx(), bond.GetIdx())]
+        data["bonds", "to", "monosacchs"].edge_index.append((bond.GetIdx(), bond.GetIntProp("mono_id")))
+    data["bonds"].x = torch.tensor(data["bonds"].x)
+    data["bonds"].num_nodes = len(data["bonds"].x)
+    data["atoms", "coboundary", "atoms"].edge_index = torch.tensor(data["atoms", "coboundary", "atoms"].edge_index, dtype=torch.long).T
+    data["atoms", "to", "bonds"].edge_index = torch.tensor(data["atoms", "to", "bonds"].edge_index, dtype=torch.long).T
+    data["bonds", "to", "monosacchs"].edge_index = torch.tensor(data["bonds", "to", "monosacchs"].edge_index, dtype=torch.long).T
+    data["bonds", "boundary", "bonds"].edge_index = torch.tensor(
+        [(bond1.GetIdx(), bond2.GetIdx()) for atom in mol.GetAtoms() for bond1 in atom.GetBonds() for bond2 in
+         atom.GetBonds() if bond1.GetIdx() != bond2.GetIdx()], dtype=torch.long).T
+    # TODO: Adjust to glycan-informed molecule
+    data["bonds", "coboundary", "bonds"].edge_index = torch.tensor(
+        [(bond1, bond2) for ring in mol.GetRingInfo().BondRings() for bond1 in ring for bond2 in ring if
+         bond1 != bond2], dtype=torch.long).T
+    data["monosacchs"].x = torch.tensor(
+        [lib_map.get(tree.nodes[node]["type"].name, len(lib_map)) for node in tree.nodes])
+    data["monosacchs"].num_nodes = len(data["monosacchs"].x)
+    data["monosacchs", "boundary", "monosacchs"].edge_index = []
+    for a, b in tree.edges:
+        data["monosacchs", "boundary", "monosacchs"].edge_index += [(a, b), (b, a)]
+    data["monosacchs", "boundary", "monosacchs"].edge_index = torch.tensor(
+        data["monosacchs", "boundary", "monosacchs"].edge_index, dtype=torch.long).T
+    return data
+
+
+# GlyLES produces wrong structure?!, even wrong modifications?
+# print(iupac2mol("GlcA(b1-2)ManOAc"))
+# print(iupac2mol("GlcNAc(b1-3)LDManHep(a1-7)LDManHep(a1-3)[Glc(b1-4)]LDManHep(a1-5)[KoOPEtN(a2-4)]Kdo"))
+
+
+class HeteroDataBatch:
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+    def to(self, device):
+        for k, v in self.__dict__.items():
+            if hasattr(v, "to"):
+                setattr(self, k, v.to(device))
+        return self
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+
+def hetero_collate(data):
+    node_types = data[0].node_types
+    edge_types = data[0].edge_types
+    x_dict = {}
+    batch_dict = {}
+    edge_index_dict = {}
+    edge_attr_dict = {}
+    iupac, smiles, y_oh, y, ids, split = [], [], [], [], [], []
+    node_counts = {node_type: [0] + [] for node_type in node_types}
+    for d in data:
+        iupac.append(d["IUPAC"])
+        smiles.append(d["smiles"])
+        y_oh.append(d["y_oh"])
+        y.append(d["y"])
+        ids.append(d["ID"])
+        split.append(d["split"])
+        for node_type in node_types:
+            node_counts[node_type].append(node_counts[node_type][-1] + d[node_type].num_nodes)
+
+    for node_type in node_types:
+        x_dict[node_type] = torch.concat([d[node_type].x for d in data], dim=0)
+        batch_dict[node_type] = torch.cat([torch.full((d[node_type].num_nodes,), i, dtype=torch.long) for i, d in enumerate(data)], dim=0)
+
+    for edge_type in edge_types:
+        tmp_edge_index = []
+        tmp_edge_attr = []
+        for i, d in enumerate(data):
+            tmp_edge_index.append(torch.stack([
+                d[edge_type].edge_index[0] + node_counts[edge_type[0]][i],
+                d[edge_type].edge_index[1] + node_counts[edge_type[2]][i]
+            ]))
+            if hasattr(d[edge_type], "edge_attr"):
+                tmp_edge_attr.append(d[edge_type].edge_attr)
+        edge_index_dict[edge_type] = torch.cat(tmp_edge_index, dim=1)
+        if len(tmp_edge_attr) != 0:
+            edge_attr_dict[edge_type] = torch.cat(tmp_edge_attr, dim=0)
+    num_nodes = {node_type: x_dict[node_type].shape[0] for node_type in node_types}
+    return HeteroDataBatch(x_dict=x_dict, edge_index_dict=edge_index_dict, edge_attr_dict=edge_attr_dict,
+                           num_nodes=num_nodes, batch_dict=batch_dict, iupac=iupac, y_oh=torch.stack(y_oh),
+                           y=torch.tensor(y), smiles=smiles, ID=ids, split=split)
+
+
+class GlycanStorage:
+    def __init__(self, path: Optional[Path] = None):
+        self.path = (path or Path("data")) / "glycan_storage.pkl"
+        self.data = self._load()
+
+    def close(self):
+        with open(self.path, "wb") as out:
+            pickle.dump(self.data, out)
+
+    def query(self, iupac):
+        if iupac not in self.data:
+            self.data[iupac] = iupac2mol(iupac)
+        return copy.deepcopy(self.data[iupac])
+
+    def _load(self):
+        if self.path.exists():
+            with open(self.path, "rb") as f:
+                return pickle.load(f)
+        return {}
+
+
+class GlycanDataModule(LightningDataModule):
+    def __init__(self, batch_size):
+        super().__init__()
+        self.batch_size = batch_size
+
+    def train_dataloader(self):
+        return DataLoader(self.train, batch_size=min(self.batch_size, len(self.train)), shuffle=True, collate_fn=hetero_collate)
+
+    def val_dataloader(self):
+        return DataLoader(self.val, batch_size=min(self.batch_size, len(self.val)), shuffle=False, collate_fn=hetero_collate)
+
+    def test_dataloader(self):
+        return DataLoader(self.test, batch_size=min(self.batch_size, len(self.test)), shuffle=False, collate_fn=hetero_collate)
+
+
+class PretrainGDM(GlycanDataModule):
+    def __init__(self, filename: str, batch_size: int = 64, train_frac: float = 0.8):
+        super().__init__(batch_size)
+        ds = PretrainGDs(filename)
+        self.train, self.val = torch.utils.data.dataset.random_split(ds, [train_frac, 1 - train_frac])
+
+
+class DownsteamGDM(GlycanDataModule):
+    def __init__(self, filename, batch_size):
+        super().__init__(batch_size)
+        self.train = DownstreamGDs(filename, "train")
+        self.val = DownstreamGDs(filename, "val")
+        self.test = DownstreamGDs(filename, "test")
+
+
+class GlycanDataset(InMemoryDataset):
+    def __init__(self, filename: str | Path, path_idx: int = 0):
+        self.filename = Path(filename)
+        ((d := Path("data")) / self.filename.stem).mkdir(exist_ok=True, parents=True)
+        super().__init__(str(d))
+        self.data, self.slices = torch.load(self.processed_paths[path_idx])
+
+    @property
+    def processed_paths(self) -> List[str]:
+        return [str(Path(self.root) / f) for f in self.processed_file_names]
+
+    def process_(self, data, path_idx: int = 0):
+        data, slices = self.collate(data)
+        torch.save((data, slices), self.processed_paths[path_idx])
+
+
+class PretrainGDs(GlycanDataset):
+    def __init__(self, filename):
+        super().__init__(filename)
+
+    @property
+    def processed_file_names(self) -> Union[str, List[str], Tuple[str, ...]]:
+        return [self.filename.stem + ".pt"]
+
+    def process(self):
+        data = []
+        # to be implemented
+        self.process_(data)
+
+
+class DownstreamGDs(GlycanDataset):
+    splits = {"train": 0, "val": 1, "test": 2}
+
+    def __init__(self, filename, split):
+        super().__init__(filename, self.splits[split])
+
+    @property
+    def processed_file_names(self) -> Union[str, List[str], Tuple[str, ...]]:
+        return [str(Path(self.filename.stem) / f"{split}.pt") for split in self.splits.keys()]
+
+    def process(self):
+        data = {k: [] for k in self.splits}
+        df = pd.read_csv(self.filename, sep="\t")
+        gs = GlycanStorage()
+        for index, (_, row) in tqdm(enumerate(df.iterrows())):
+            # try:
+            d = gs.query(row["glycan"])
+            if d is None:
+                continue
+            d["y_oh"] = torch.tensor([int(x) for x in row["label"][1:-1].split(" ")])
+            d["y"] = d["y_oh"].argmax().item()
+            d["ID"] = index
+            data[row["split"]].append(d)
+            # except Exception as e:
+            #     print("Failed to process", row["glycan"], "\n\t", e)
+        gs.close()
+        print("Processed", sum(len(v) for v in data.values()), "entries")
+        for split in self.splits:
+            self.process_(data[split], path_idx=self.splits[split])
