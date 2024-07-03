@@ -1,0 +1,15 @@
+dataset-name: Taxonomy_Subdomain
+seed: 42
+data_dir: ./
+root_dir: ./data
+featurization:
+  - name: gnngly
+model:
+  name: gnngly
+  hidden_dim: 14
+  batch_size: 256
+  num_layers: 5
+  epochs: 200
+  patience: 30
+  learning_rate: 0
+  optimizer: Adam

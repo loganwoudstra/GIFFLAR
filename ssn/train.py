@@ -1,47 +1,67 @@
 import torch
+import yaml
+from jsonargparse import ArgumentParser
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import RichProgressBar, RichModelSummary
 from pytorch_lightning.loggers import CSVLogger
 from torch_geometric import seed_everything
-from torch_geometric.data import HeteroData
 
+from ssn.baselines.gnngly import GNNGLY
+from ssn.baselines.sweetnet import SweetNetLightning
 from ssn.data import DownsteamGDM
-from ssn.benchmarks import get_taxonomic_level
+from ssn.benchmarks import get_dataset
 from ssn.model import DownstreamGGIN
 
+torch.autograd.set_detect_anomaly(True)
 
-def check_data(d: HeteroData):
-    if d is None or \
-            not torch.gt(torch.tensor(d["atoms"].x.shape[0]), torch.tensor(10)) or \
-            not torch.gt(torch.tensor(d["bonds"].x.shape[0]), torch.tensor(10)) or \
-            not torch.gt(torch.tensor(d["atoms", "coboundary", "atoms"].edge_index.shape[1]), torch.tensor(1)) or \
-            not torch.gt(torch.tensor(d["atoms", "to", "bonds"].edge_index.shape[1]), torch.tensor(1)) or \
-            not torch.gt(torch.tensor(d["bonds", "to", "monosacchs"].edge_index.shape[1]), torch.tensor(1)) or \
-            not torch.gt(torch.tensor(d["bonds", "boundary", "bonds"].edge_index.shape[1]), torch.tensor(1)) or \
-            not torch.ge(torch.tensor(d["monosacchs"].x.shape[0]), torch.tensor(1)) or \
-            not torch.ge(torch.tensor(d["monosacchs", "boundary", "monosacchs"].edge_index.shape[1]), torch.tensor(0)):
-            # not torch.gt(torch.tensor(d["bonds", "coboundary", "bonds"].edge_index.shape[1]), torch.tensor(1)) or \
-        return False
-    return True
+models = {
+    "ssn": DownstreamGGIN,
+    "gnngly": GNNGLY,
+    "sweetnet": SweetNetLightning,
+}
 
 
-def train(batch_size: int, seed: int, taxonomy_level: str = "Domain"):
-    seed_everything(seed)
-    path = get_taxonomic_level(taxonomy_level)
-    datamodule = DownsteamGDM(path, batch_size)
-    model = DownstreamGGIN(hidden_dim=128, output_dim=5, num_layers=3, batch_size=batch_size)
-    logger = CSVLogger("logs", name="ssn")
+def train(**kwargs):
+    seed_everything(kwargs["seed"])
+    data_config = get_dataset(kwargs["dataset-name"])
+    datamodule = DownsteamGDM(root=kwargs["root_dir"], filename=data_config["filepath"],
+                              batch_size=kwargs["model"]["batch_size"], **kwargs)
+    model = models[kwargs["model"]["name"]](output_dim=data_config["num_classes"], **kwargs["model"])
+    logger = CSVLogger("logs", name=kwargs["model"]["name"])
     trainer = Trainer(
         callbacks=[
             # ModelCheckpoint(save_last=True, mode="min", monitor="val/reg/loss", save_top_k=1),
             RichModelSummary(),
             RichProgressBar(),
         ],
-        max_epochs=100,
+        max_epochs=kwargs["model"]["epochs"],
         logger=logger
     )
     trainer.fit(model, datamodule)
 
 
-# train(32, 42, "Kingdom")
-train(32, 42, "Subdomain")
+def read_yaml_config(filename: str) -> dict:
+    """Read in yaml config for training."""
+    with open(filename, "r") as file:
+        config = yaml.load(file, Loader=yaml.FullLoader)
+    return config
+
+
+def merge_dicts(a: dict, b: dict):
+    out = a
+    for key in b:
+        if key in a and isinstance(a[key], dict) and isinstance(b[key], dict):
+            out[key] = merge_dicts(a[key], b[key])
+        else:
+            out[key] = b[key]
+    return out
+
+
+if __name__ == '__main__':
+    parser = ArgumentParser()
+    parser.add_argument("config", type=str, help="Path to YAML config file")
+    default_args = read_yaml_config("configs/default.yaml")
+    custom_args = read_yaml_config(parser.parse_args().config)
+    merged_args = merge_dicts(default_args, custom_args)
+    print(merged_args)
+    train(**merged_args)

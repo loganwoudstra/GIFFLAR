@@ -1,8 +1,40 @@
-from glycowork.ml.model_training import training_setup, train_model
 from glycowork.ml.models import prep_model
+from torch_geometric.nn import global_mean_pool
+import torch.nn.functional as F
+
+from ssn.model import DownstreamGGIN
 
 
-def train(hidden_dim: int = 128):
-    model = prep_model("SweetNet", None, hidden_dim=hidden_dim)
-    optimizer, lr, criterion = training_setup(model, 0.0001)
-    m = train_model(model, None, criterion, optimizer, lr, 100, 20, mode="classification", mode2="multi")
+class SweetNetLightning(DownstreamGGIN):
+    def __init__(self, hidden_dim: int, output_dim: int, **kwargs):
+        super().__init__(hidden_dim, output_dim)
+
+        self.model = prep_model("SweetNet", output_dim, hidden_dim=hidden_dim)
+
+    def forward(self, x_dict, edge_index_dict, batch_dict):
+        x = x_dict["atoms"]
+        batch = batch_dict["atoms"]
+        edge_index = edge_index_dict["atoms", "coboundary", "atoms"]
+
+        # Getting node features
+        x = self.model.item_embedding(x)
+        x = x.squeeze(1)
+
+        # Graph convolution operations
+        x = F.leaky_relu(self.model.conv1(x, edge_index))
+        x = F.leaky_relu(self.model.conv2(x, edge_index))
+        node_embeds = F.leaky_relu(self.model.conv3(x, edge_index))
+        graph_embed = global_mean_pool(node_embeds, batch)
+
+        # Fully connected part
+        x = self.model.act1(self.model.bn1(self.model.lin1(graph_embed)))
+        x_out = self.model.bn2(self.model.lin2(x))
+        x = F.dropout(self.model.act2(x_out), p=0.5, training=self.model.training)
+
+        x = self.model.lin3(x).squeeze(1)
+
+        return {
+            "node_embed": node_embeds,
+            "graph_embed": graph_embed,
+            "preds": x,
+        }

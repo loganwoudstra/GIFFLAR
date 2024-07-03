@@ -7,7 +7,7 @@ from torch import nn
 from torch_geometric.nn import GINConv, HeteroConv, global_mean_pool
 from torchmetrics import Accuracy, MetricCollection, MatthewsCorrCoef, AUROC
 
-from ssn.data import atom_map, bond_map
+from ssn.utils import atom_map, bond_map
 
 
 def dict_embeddings(dim: int, keys: List[object]):
@@ -51,8 +51,8 @@ class GlycanGIN(LightningModule):
         self.pooling = global_mean_pool
 
     def forward(self, x_dict, edge_index_dict, batch_dict):
-        for node_type, x in x_dict.items():
-            x_dict[node_type] = self.embedding[node_type](x)
+        # for node_type, x in x_dict.items():
+        #     x_dict[node_type] = self.embedding[node_type](x)
 
         for conv in self.convs:
             x_dict = conv(x_dict, edge_index_dict)
@@ -64,7 +64,7 @@ class GlycanGIN(LightningModule):
 
 
 class DownstreamGGIN(GlycanGIN):
-    def __init__(self, hidden_dim: int, output_dim: int, num_layers: int = 3, batch_size: int = 32):
+    def __init__(self, hidden_dim: int, output_dim: int, num_layers: int = 3, batch_size: int = 32, **kwargs):
         super().__init__(hidden_dim, num_layers)
 
         self.head = nn.Sequential(

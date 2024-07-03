@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -38,3 +39,23 @@ def get_taxonomic_level(level):
         tax["split"] = np.random.choice(["train", "val", "test"], tax.shape[0], p=[0.7, 0.2, 0.1])
         tax.to_csv(p, sep="\t", index=False)
     return p
+
+
+taxonomy_classes = {
+    "Domain": 5,
+    "Subdomain": 5,
+}
+
+
+def get_dataset(dataset_name) -> Dict[str, Optional[Path | str | int]]:
+    name_fracs = dataset_name.split("_")
+    match name_fracs[0]:
+        case "Taxonomy":
+            path = get_taxonomic_level(name_fracs[1])
+            n_classes = taxonomy_classes[name_fracs[1]]
+        case _:
+            raise ValueError(f"Unknown dataset {dataset_name}.")
+    return {
+        "filepath": path,
+        "num_classes": n_classes,
+    }

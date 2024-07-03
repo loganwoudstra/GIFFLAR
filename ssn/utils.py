@@ -1,9 +1,18 @@
 import re
 
 import networkx as nx
+from glycowork.glycan_data.loader import lib
 from glyles.glycans.poly.merger import Merger
 from rdkit import Chem
 from rdkit.Chem import BondType
+
+
+atom_map = {6: 0, 7: 1, 8: 2, 15: 3, 16: 4}
+bond_map = {Chem.BondType.SINGLE: 0, Chem.BondType.AROMATIC: 1, Chem.BondType.DOUBLE: 2, Chem.BondType.TRIPLE: 3}
+lib_map = {n: i for i, n in enumerate(lib)}
+chiral_map = {n: i for i, n in enumerate([
+    Chem.BondDir.BEGINDASH, Chem.BondDir.BEGINWEDGE, Chem.BondDir.NONE
+])}
 
 
 def mol2nx(mol, node):
