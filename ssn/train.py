@@ -7,6 +7,7 @@ from pytorch_lightning.loggers import CSVLogger
 from torch_geometric import seed_everything
 
 from ssn.baselines.gnngly import GNNGLY
+from ssn.baselines.mlp import MLP
 from ssn.baselines.sweetnet import SweetNetLightning
 from ssn.data import DownsteamGDM
 from ssn.benchmarks import get_dataset
@@ -17,6 +18,7 @@ torch.autograd.set_detect_anomaly(True)
 models = {
     "ssn": DownstreamGGIN,
     "gnngly": GNNGLY,
+    "mlp": MLP,
     "sweetnet": SweetNetLightning,
 }
 

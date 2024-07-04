@@ -11,10 +11,10 @@ class SweetNetLightning(DownstreamGGIN):
 
         self.model = prep_model("SweetNet", output_dim, hidden_dim=hidden_dim)
 
-    def forward(self, x_dict, edge_index_dict, batch_dict):
-        x = x_dict["atoms"]
-        batch = batch_dict["atoms"]
-        edge_index = edge_index_dict["atoms", "coboundary", "atoms"]
+    def forward(self, batch):
+        x = batch.x_dict["atoms"]
+        batch_ids = batch.batch_dict["atoms"]
+        edge_index = batch.edge_index_dict["atoms", "coboundary", "atoms"]
 
         # Getting node features
         x = self.model.item_embedding(x)
@@ -24,7 +24,7 @@ class SweetNetLightning(DownstreamGGIN):
         x = F.leaky_relu(self.model.conv1(x, edge_index))
         x = F.leaky_relu(self.model.conv2(x, edge_index))
         node_embeds = F.leaky_relu(self.model.conv3(x, edge_index))
-        graph_embed = global_mean_pool(node_embeds, batch)
+        graph_embed = global_mean_pool(node_embeds, batch_ids)
 
         # Fully connected part
         x = self.model.act1(self.model.bn1(self.model.lin1(graph_embed)))

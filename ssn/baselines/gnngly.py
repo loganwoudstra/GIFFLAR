@@ -39,15 +39,15 @@ class GNNGLY(DownstreamGGIN):
             nn.Linear(64, output_dim),
         )
 
-    def forward(self, x_dict, edge_index_dict, batch_dict):
-        x = x_dict["atoms"]
-        batch = batch_dict["atoms"]
-        edge_index = edge_index_dict["atoms", "coboundary", "atoms"]
+    def forward(self, batch):
+        x = batch.x_dict["atoms"]
+        batch_ids = batch.batch_dict["atoms"]
+        edge_index = batch.edge_index_dict["atoms", "coboundary", "atoms"]
 
         for layer in self.layers:
             x = layer(x, edge_index)
 
-        graph_embed = self.pooling(x, batch)
+        graph_embed = self.pooling(x, batch_ids)
         pred = self.head(graph_embed)
         return {
             "node_embed": x,

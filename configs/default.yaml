@@ -20,6 +20,7 @@ featurization:
     index: 0
     mode: random
 model:
+  name: ssn
   hidden_dim: 128
   batch_size: 32
   num_layers: 3

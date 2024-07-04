@@ -50,16 +50,13 @@ class GlycanGIN(LightningModule):
 
         self.pooling = global_mean_pool
 
-    def forward(self, x_dict, edge_index_dict, batch_dict):
-        # for node_type, x in x_dict.items():
-        #     x_dict[node_type] = self.embedding[node_type](x)
-
+    def forward(self, batch):
         for conv in self.convs:
-            x_dict = conv(x_dict, edge_index_dict)
+            batch.x_dict = conv(batch.x_dict, batch.edge_index_dict)
 
-        return x_dict, self.pooling(
-            torch.concat([x_dict["atoms"], x_dict["bonds"], x_dict["monosacchs"]], dim=0),
-            torch.concat([batch_dict["atoms"], batch_dict["bonds"], batch_dict["monosacchs"]], dim=0)
+        return batch.x_dict, self.pooling(
+            torch.concat([batch.x_dict["atoms"], batch.x_dict["bonds"], batch.x_dict["monosacchs"]], dim=0),
+            torch.concat([batch.batch_dict["atoms"], batch.batch_dict["bonds"], batch.batch_dict["monosacchs"]], dim=0)
         )
 
 
@@ -96,8 +93,8 @@ class DownstreamGGIN(GlycanGIN):
             ])
         return {"train": m.clone(prefix="train/"), "val": m.clone(prefix="val/"), "test": m.clone(prefix="test/")}
 
-    def forward(self, x_dict, edge_index_dict, batch_dict):
-        node_embed, graph_embed = super().forward(x_dict, edge_index_dict, batch_dict)
+    def forward(self, batch):
+        node_embed, graph_embed = super().forward(batch)
         pred = self.head(graph_embed)
         return {
             "node_embed": node_embed,
@@ -106,7 +103,7 @@ class DownstreamGGIN(GlycanGIN):
         }
 
     def shared_step(self, batch, batch_idx, stage: str):
-        fwd_dict = self.forward(batch.x_dict, batch.edge_index_dict, batch.batch_dict)
+        fwd_dict = self.forward(batch)
         fwd_dict["labels"] = batch["y"]
         fwd_dict["loss"] = self.loss(fwd_dict["preds"], fwd_dict["labels"])
         self.metrics[stage].update(fwd_dict["preds"], fwd_dict["labels"])

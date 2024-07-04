@@ -15,7 +15,7 @@ from glyles.glycans.factory.factory import MonomerFactory
 from tqdm import tqdm
 
 from ssn.pretransforms import assemble_transforms
-from ssn.utils import S3NMerger, nx2mol, bond_map, atom_map, lib_map, chiral_map
+from ssn.utils import S3NMerger, nx2mol, bond_map, lib_map
 
 
 def iupac2mol(iupac: str = "Fuc(a1-4)Gal(a1-4)Glc"):
@@ -111,7 +111,6 @@ def hetero_collate(data):
     batch_dict = {}
     edge_index_dict = {}
     edge_attr_dict = {}
-    # TODO: extend to arbitrary features (might come from (pre-)transforms)
     kwargs = {key: [] for key in dict(data[0])}
     node_counts = {node_type: [0] + [] for node_type in node_types}
     for d in data:
@@ -195,13 +194,14 @@ class PretrainGDM(GlycanDataModule):
 class DownsteamGDM(GlycanDataModule):
     def __init__(self, root, filename, batch_size, **kwargs):
         super().__init__(batch_size)
-        transform, pre_transform = assemble_transforms(**kwargs)
-        self.train = DownstreamGDs(root=root, filename=filename, split="train", transform=transform,
-                                   pre_transform=pre_transform)
-        self.val = DownstreamGDs(root=root, filename=filename, split="val", transform=transform,
-                                 pre_transform=pre_transform)
-        self.test = DownstreamGDs(root=root, filename=filename, split="test", transform=transform,
-                                  pre_transform=pre_transform)
+        pre_transform, transform = assemble_transforms(**kwargs)
+        print(pre_transform, "\n", transform)
+        self.train = DownstreamGDs(root=root, filename=filename, split="train", name=kwargs["model"]["name"],
+                                   transform=transform, pre_transform=pre_transform)
+        self.val = DownstreamGDs(root=root, filename=filename, split="val",  name=kwargs["model"]["name"],
+                                 transform=transform, pre_transform=pre_transform)
+        self.test = DownstreamGDs(root=root, filename=filename, split="test",  name=kwargs["model"]["name"],
+                                  transform=transform, pre_transform=pre_transform)
 
 
 class GlycanDataset(InMemoryDataset):
@@ -209,12 +209,13 @@ class GlycanDataset(InMemoryDataset):
             self,
             root: str | Path,
             filename: str | Path,
+            name: str,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
             path_idx: int = 0,
     ):
-        self.filename = filename
-        super().__init__(root=str(Path(root) / Path(filename).stem), transform=transform, pre_transform=pre_transform)
+        self.filename = Path(filename)
+        super().__init__(root=str(Path(root) / filename.stem / name), transform=transform, pre_transform=pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[path_idx])
 
     @property
@@ -222,6 +223,11 @@ class GlycanDataset(InMemoryDataset):
         return [str(Path(self.root) / f) for f in self.processed_file_names]
 
     def process_(self, data, path_idx: int = 0):
+        if self.pre_filter is not None:
+            data = [d for d in data if self.pre_filter(d)]
+        if self.pre_transform is not None:
+            data = [self.pre_transform(d) for d in data]
+
         data, slices = self.collate(data)
         torch.save((data, slices), self.processed_paths[path_idx])
 
@@ -231,10 +237,11 @@ class PretrainGDs(GlycanDataset):
             self,
             root: str | Path,
             filename: str | Path,
+            name: str,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None
     ):
-        super().__init__(root=root, filename=filename, transform=transform, pre_transform=pre_transform)
+        super().__init__(root=root, filename=filename, name=name, transform=transform, pre_transform=pre_transform)
 
     @property
     def processed_file_names(self) -> Union[str, List[str], Tuple[str, ...]]:
@@ -254,11 +261,16 @@ class DownstreamGDs(GlycanDataset):
             root: str | Path,
             filename: str | Path,
             split: str,
+            name: str,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
     ):
-        super().__init__(root=root, filename=filename, transform=transform, pre_transform=pre_transform,
+        super().__init__(root=root, filename=filename, name=name, transform=transform, pre_transform=pre_transform,
                          path_idx=self.splits[split])
+
+    # @property
+    # def processed_dir(self) -> str:
+    #     return str(Path(self.root) / "processed" / self.name)
 
     @property
     def processed_file_names(self) -> Union[str, List[str], Tuple[str, ...]]:

@@ -3,6 +3,8 @@ from typing import Tuple, Literal, Optional
 import torch
 from glycowork.glycan_data.loader import lib
 from glycowork.motif.graph import glycan_to_nxGraph
+from rdkit import Chem
+from rdkit.Chem import AllChem, rdFingerprintGenerator
 from torch import nn
 from torch_geometric import transforms as T
 from torch_geometric.transforms.base_transform import BaseTransform
@@ -13,7 +15,7 @@ from ssn.utils import atom_map, bond_map
 
 class RootTransform(BaseTransform):
     def __init__(self, **kwargs):
-        print(f"Transform {self.__class__.__name__} initialized")
+        pass
 
 
 class ScalarTransform(RootTransform):
@@ -83,7 +85,17 @@ class GNNGLYTransform(RootTransform):
             formal_charge_embed,
             hydrogen_count_embed,
             hybridization_embed,
-        ], dim=1)
+        ], dim=1).float()
+        return data
+
+
+class MLPTransform(RootTransform):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.fpler = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=1024)
+
+    def __call__(self, data):
+        data["fp"] = torch.tensor(self.fpler.GetFingerprint(Chem.MolFromSmiles(data["smiles"])), dtype=torch.float).reshape(1, -1)
         return data
 
 
@@ -113,6 +125,7 @@ transformation_list = {
     "clean": SimplexCleanTransform,
     "scalar": ScalarTransform,
     "gnngly": GNNGLYTransform,
+    "mlp": MLPTransform,
     "sweetnet": SweetNetTransform,
 }
 
