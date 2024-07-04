@@ -12,8 +12,7 @@ from ssn.baselines.sweetnet import SweetNetLightning
 from ssn.data import DownsteamGDM
 from ssn.benchmarks import get_dataset
 from ssn.model import DownstreamGGIN
-
-torch.autograd.set_detect_anomaly(True)
+from ssn.utils import get_sl_model, get_metrics
 
 models = {
     "ssn": DownstreamGGIN,
@@ -21,6 +20,30 @@ models = {
     "mlp": MLP,
     "sweetnet": SweetNetLightning,
 }
+
+
+def fit(**kwargs):
+    seed_everything(kwargs["seed"])
+    data_config = get_dataset(kwargs["dataset-name"])
+    datamodule = DownsteamGDM(root=kwargs["root_dir"], filename=data_config["filepath"], batch_size=1, **kwargs)
+    logger = CSVLogger("logs", name=kwargs["model"]["name"])
+    model = get_sl_model(kwargs["model"]["name"], data_config["task"], data_config["num_classes"], **kwargs)
+    metrics = get_metrics(data_config["task"], data_config["num_classes"])
+
+    train_X, train_y = datamodule.train.to_statistical_learning()
+    model.fit(train_X, train_y)
+
+    for X, y, name in [
+        (train_X, train_y, "train"),
+        (*datamodule.val.to_statistical_learning(), "val"),
+        (*datamodule.test.to_statistical_learning(), "test"),
+    ]:
+        preds = model.predict_proba(X)
+        t_preds = torch.tensor(preds, dtype=torch.float)
+        t_labels = torch.tensor(y, dtype=torch.long)
+        metrics[name].update(t_preds, t_labels)
+        logger.log_metrics(metrics[name].compute())
+    logger.save()
 
 
 def train(**kwargs):
@@ -62,8 +85,11 @@ def merge_dicts(a: dict, b: dict):
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument("config", type=str, help="Path to YAML config file")
-    default_args = read_yaml_config("configs/default.yaml")
+    # default_args = read_yaml_config("configs/default.yaml")
     custom_args = read_yaml_config(parser.parse_args().config)
-    merged_args = merge_dicts(default_args, custom_args)
-    print(merged_args)
-    train(**merged_args)
+    # merged_args = merge_dicts(default_args, custom_args)
+    # print(merged_args)
+    if custom_args["model"]["name"] in ["rf", "svm", "xgb"]:
+        fit(**custom_args)
+    else:
+        train(**custom_args)

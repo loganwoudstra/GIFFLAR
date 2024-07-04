@@ -1,11 +1,18 @@
 import re
+from pathlib import Path
+from typing import NamedTuple, Optional, Literal, TypedDict
 
 import networkx as nx
 from glycowork.glycan_data.loader import lib
 from glyles.glycans.poly.merger import Merger
 from rdkit import Chem
 from rdkit.Chem import BondType
-
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, GradientBoostingRegressor, \
+    GradientBoostingClassifier
+from sklearn.multioutput import MultiOutputRegressor, MultiOutputClassifier
+from sklearn.svm import LinearSVC, LinearSVR
+from torchmetrics import MetricCollection, Accuracy, AUROC, MatthewsCorrCoef, MeanAbsoluteError, MeanSquaredError, \
+    R2Score
 
 atom_map = {6: 0, 7: 1, 8: 2, 15: 3, 16: 4}
 bond_map = {Chem.BondType.SINGLE: 0, Chem.BondType.AROMATIC: 1, Chem.BondType.DOUBLE: 2, Chem.BondType.TRIPLE: 3}
@@ -13,6 +20,68 @@ lib_map = {n: i for i, n in enumerate(lib)}
 chiral_map = {n: i for i, n in enumerate([
     Chem.BondDir.BEGINDASH, Chem.BondDir.BEGINWEDGE, Chem.BondDir.NONE
 ])}
+
+
+def get_sl_model(
+        name: Literal["rf", "svm", "xgb"],
+        task: Literal["regression", "classification", "multilabel"],
+        n_outputs,
+        **kwargs
+):
+    model_args = {k: v for k, v in kwargs["model"].items() if k != "name"}
+    match name, task, n_outputs:
+        case "rf", "regression", _:
+            return RandomForestRegressor(**model_args)
+        case "rf", _, _:
+            return RandomForestClassifier(**model_args)
+        case "svm", "regression", 1:
+            return LinearSVR(**model_args)
+        case "svm", "regression", _:
+            return MultiOutputRegressor(LinearSVR(**model_args))
+        case "svm", "classification", 1:
+            return LinearSVC(**model_args)
+        case "svm", "classification", _:
+            return MultiOutputClassifier(LinearSVC(**model_args))
+        case "svm", "multilabel", _:
+            raise NotImplementedError("SVCs for Multi-label classification are not included yet.")
+        case "xgb", "regression", 1:
+            return GradientBoostingRegressor(**model_args)
+        case "xgb", "regression", _:
+            return MultiOutputRegressor(GradientBoostingRegressor(**model_args))
+        case "xgb", "classification", 1:
+            return GradientBoostingClassifier(**model_args)
+        case "xgb", "classification", _:
+            return MultiOutputClassifier(GradientBoostingClassifier(**model_args))
+        case "xgb", "multilabel", _:
+            raise NotImplementedError("SVCs for Multi-label classification are not included yet.")
+        case _:
+            raise NotImplementedError(f"The combination of (name, task, n_outputs) as ({name} {task}, {n_outputs}) has "
+                                      f"not been considered.")
+
+
+def get_metrics(task: Literal["regression", "classification", "multilabel"], n_outputs: int):
+    if task == "regression":
+        m = MetricCollection([
+            MeanSquaredError(),
+            MeanAbsoluteError(),
+            R2Score(),
+        ])
+    else:
+        if n_outputs == 1:
+            metric_args = {"task": "binary"}
+        else:
+            metric_args = {"task": "multiclass", "num_classes": n_outputs}
+        m = MetricCollection([
+            Accuracy(**metric_args),
+            AUROC(**metric_args),
+            MatthewsCorrCoef(**metric_args),
+        ])
+    return {"train": m.clone(prefix="train/"), "val": m.clone(prefix="val/"), "test": m.clone(prefix="test/")}
+
+class DatasetInfo(TypedDict):
+    filepath: Optional[Path | str]
+    num_classes: int
+    task: Literal["regression", "classification", "multilabel"]
 
 
 def mol2nx(mol, node):
@@ -110,7 +179,8 @@ def connect_nx(atom, child_start, kids, me, original_atom):
 
     # G.add_edge(me_idx, len(me) + child_start, bond_type=BondType.SINGLE, mono_id=nx.get_node_attributes(kids, "mono_id")[child_start])
 
-    G.add_edge(me_idx, len(me) + anchor_c, bond_type=BondType.SINGLE, mono_id=nx.get_node_attributes(kids, "mono_id")[child_start])
+    G.add_edge(me_idx, len(me) + anchor_c, bond_type=BondType.SINGLE,
+               mono_id=nx.get_node_attributes(kids, "mono_id")[child_start])
     G.remove_node(len(me) + child_start)
 
     G.nodes[me_idx]["atomic_num"] = original_atom

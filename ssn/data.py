@@ -3,6 +3,7 @@ import pickle
 from pathlib import Path
 from typing import List, Union, Tuple, Optional, Callable
 
+import numpy as np
 import pandas as pd
 import torch
 from rdkit import Chem
@@ -265,16 +266,21 @@ class DownstreamGDs(GlycanDataset):
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
     ):
+        if name in ["rf", "svm", "xgb"]:
+            name = "mlp"
         super().__init__(root=root, filename=filename, name=name, transform=transform, pre_transform=pre_transform,
                          path_idx=self.splits[split])
-
-    # @property
-    # def processed_dir(self) -> str:
-    #     return str(Path(self.root) / "processed" / self.name)
 
     @property
     def processed_file_names(self) -> Union[str, List[str], Tuple[str, ...]]:
         return [split + ".pt" for split in self.splits.keys()]
+
+    def to_statistical_learning(self):
+        X, y = [], []
+        for d in self:
+            X.append(d["fp"])
+            y.append(d["y"])
+        return np.vstack(X), np.concatenate(y)
 
     def process(self):
         data = {k: [] for k in self.splits}

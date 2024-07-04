@@ -7,6 +7,8 @@ from glycowork.glycan_data.loader import df_species as taxonomy
 from glyles import convert
 from tqdm import tqdm
 
+from ssn.utils import DatasetInfo
+
 
 def iupac2smiles(iupac):
     if any([x in iupac for x in ["?", "{", "}"]]):
@@ -47,7 +49,7 @@ taxonomy_classes = {
 }
 
 
-def get_dataset(dataset_name) -> Dict[str, Optional[Path | str | int]]:
+def get_dataset(dataset_name) -> DatasetInfo:
     name_fracs = dataset_name.split("_")
     match name_fracs[0]:
         case "Taxonomy":
@@ -58,4 +60,5 @@ def get_dataset(dataset_name) -> Dict[str, Optional[Path | str | int]]:
     return {
         "filepath": path,
         "num_classes": n_classes,
+        "task": "classification",
     }

@@ -7,7 +7,7 @@ from torch import nn
 from torch_geometric.nn import GINConv, HeteroConv, global_mean_pool
 from torchmetrics import Accuracy, MetricCollection, MatthewsCorrCoef, AUROC
 
-from ssn.utils import atom_map, bond_map
+from ssn.utils import atom_map, bond_map, get_metrics
 
 
 def dict_embeddings(dim: int, keys: List[object]):
@@ -76,22 +76,7 @@ class DownstreamGGIN(GlycanGIN):
             self.loss = nn.BCEWithLogitsLoss()
         else:
             self.loss = nn.CrossEntropyLoss()
-        self.metrics = self._metrics(output_dim)
-
-    def _metrics(self, num_classes: int):
-        if num_classes == 1:
-            m = MetricCollection([
-                Accuracy(task="binary"),
-                AUROC(task="binary"),
-                MatthewsCorrCoef(task="binary"),
-            ])
-        else:
-            m = MetricCollection([
-                Accuracy(task="multiclass", num_classes=num_classes),
-                AUROC(task="multiclass", num_classes=num_classes),
-                MatthewsCorrCoef(task="multiclass", num_classes=num_classes),
-            ])
-        return {"train": m.clone(prefix="train/"), "val": m.clone(prefix="val/"), "test": m.clone(prefix="test/")}
+        self.metrics = get_metrics(None, output_dim)
 
     def forward(self, batch):
         node_embed, graph_embed = super().forward(batch)
