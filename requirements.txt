@@ -7,3 +7,5 @@ pandas
 git+https://github.com/KalininaLab/glyles.git
 glycowork
 jsonargparse
+rich
+pytorch-lightning

@@ -28,7 +28,7 @@ def get_sl_model(
         n_outputs,
         **kwargs
 ):
-    model_args = {k: v for k, v in kwargs["model"].items() if k != "name"}
+    model_args = {k: v for k, v in kwargs["model"].items() if k not in {"name", "featurization"}}
     match name, task, n_outputs:
         case "rf", "regression", _:
             return RandomForestRegressor(**model_args)

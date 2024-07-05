@@ -81,7 +81,7 @@ taxonomy_classes: Dict[str, RawDataInfo] = {
     "Family": (1, "multilabel"),
     "Genus": (1, "multilabel"),
     "Species": (1, "multilabel"),
-    "Immunogenicity": (2, "classification"),
+    "Immunogenicity": (1, "classification"),
     "Glycosylation": (3, "classification"),
 }
 

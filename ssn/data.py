@@ -276,11 +276,13 @@ class DownstreamGDs(GlycanDataset):
         return [split + ".pt" for split in self.splits.keys()]
 
     def to_statistical_learning(self):
-        X, y = [], []
+        X, y, y_oh = [], [], []
         for d in self:
             X.append(d["fp"])
             y.append(d["y"])
-        return np.vstack(X), np.concatenate(y)
+            if "y_oh" in d:
+                y_oh.append(d["y_oh"])
+        return np.vstack(X), np.concatenate(y), np.vstack(y_oh) if len(y_oh) != 0 else None
 
     def process(self):
         data = {k: [] for k in self.splits}

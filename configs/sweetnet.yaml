@@ -2,8 +2,6 @@ dataset-name: Taxonomy_Subdomain
 seed: 42
 data_dir: ./
 root_dir: ./data
-featurization:
-  - name: sweetnet
 model:
   name: sweetnet
   hidden_dim: 128
@@ -12,3 +10,5 @@ model:
   patience: 30
   learning_rate: 0.001
   optimizer: Adam
+  featurization:
+    - name: sweetnet

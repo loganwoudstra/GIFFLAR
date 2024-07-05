@@ -2,8 +2,6 @@ dataset-name: Taxonomy_Subdomain
 seed: 42
 data_dir: ./
 root_dir: ./data
-featurization:
-  - name: gnngly
 model:
   name: gnngly
   hidden_dim: 14
@@ -13,3 +11,5 @@ model:
   patience: 30
   learning_rate: 0
   optimizer: Adam
+  featurization:
+    - name: gnngly
