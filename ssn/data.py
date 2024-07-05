@@ -291,8 +291,11 @@ class DownstreamGDs(GlycanDataset):
                 d = gs.query(row["glycan"])
                 if d is None:
                     continue
-                d["y_oh"] = torch.tensor([int(x) for x in row["label"][1:-1].split(" ")])
-                d["y"] = d["y_oh"].argmax().item()
+                if isinstance(row["label"], str) and "[" in row["label"] and "]" in row["label"]:
+                    d["y_oh"] = torch.tensor([int(x) for x in row["label"][1:-1].split(" ")])
+                    d["y"] = d["y_oh"].argmax().item()
+                else:
+                    d["y"] = row["label"]
                 d["ID"] = index
                 data[row["split"]].append(d)
             except Exception as e:

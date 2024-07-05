@@ -132,7 +132,7 @@ transformation_list = {
 
 def assemble_transforms(**kwargs) -> Tuple[Optional[T.Compose], Optional[T.Compose]]:
     pre_transforms = T.Compose([
-                                   transformation_list[args["name"]](**args) for args in kwargs["featurization"]
-                               ] + [CollectionTransform()])
+        transformation_list[args["name"]](**args) for args in kwargs["model"]["featurization"]
+    ] + [CollectionTransform()])
     transforms = None
     return pre_transforms, transforms

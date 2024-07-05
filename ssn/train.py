@@ -1,3 +1,5 @@
+import copy
+
 import torch
 import yaml
 from jsonargparse import ArgumentParser
@@ -14,7 +16,7 @@ from ssn.benchmarks import get_dataset
 from ssn.model import DownstreamGGIN
 from ssn.utils import get_sl_model, get_metrics
 
-models = {
+MODELS = {
     "ssn": DownstreamGGIN,
     "gnngly": GNNGLY,
     "mlp": MLP,
@@ -51,7 +53,7 @@ def train(**kwargs):
     data_config = get_dataset(kwargs["dataset-name"])
     datamodule = DownsteamGDM(root=kwargs["root_dir"], filename=data_config["filepath"],
                               batch_size=kwargs["model"]["batch_size"], **kwargs)
-    model = models[kwargs["model"]["name"]](output_dim=data_config["num_classes"], **kwargs["model"])
+    model = MODELS[kwargs["model"]["name"]](output_dim=data_config["num_classes"], **kwargs["model"])
     logger = CSVLogger("logs", name=kwargs["model"]["name"])
     trainer = Trainer(
         callbacks=[
@@ -82,6 +84,27 @@ def merge_dicts(a: dict, b: dict):
     return out
 
 
+def unfold_config(config):
+    if isinstance(config["dataset-name"], str):
+        dataset_names = [config["dataset-name"]]
+    else:
+        dataset_names = config["dataset-name"]
+    del config["dataset-name"]
+
+    if isinstance(config["model"], dict):
+        models = [config["model"]]
+    else:
+        models = config["model"]
+    del config["model"]
+
+    for dataset_name in dataset_names:
+        for model in models:
+            tmp_config = copy.deepcopy(config)
+            tmp_config["dataset-name"] = dataset_name
+            tmp_config["model"] = model
+            yield tmp_config
+
+
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument("config", type=str, help="Path to YAML config file")
@@ -89,7 +112,12 @@ if __name__ == '__main__':
     custom_args = read_yaml_config(parser.parse_args().config)
     # merged_args = merge_dicts(default_args, custom_args)
     # print(merged_args)
-    if custom_args["model"]["name"] in ["rf", "svm", "xgb"]:
-        fit(**custom_args)
-    else:
-        train(**custom_args)
+    for args in unfold_config(custom_args):
+        if args["model"]["name"] in ["rf", "svm", "xgb"]:
+            fit(**args)
+        else:
+            train(**args)
+    # if custom_args["model"]["name"] in ["rf", "svm", "xgb"]:
+    #     fit(**custom_args)
+    # else:
+    #     train(**custom_args)
