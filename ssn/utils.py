@@ -78,8 +78,14 @@ def get_metrics(task: Literal["regression", "classification", "multilabel"], n_o
         ])
     return {"train": m.clone(prefix="train/"), "val": m.clone(prefix="val/"), "test": m.clone(prefix="test/")}
 
+
 class DatasetInfo(TypedDict):
     filepath: Optional[Path | str]
+    num_classes: int
+    task: Literal["regression", "classification", "multilabel"]
+
+
+class RawDataInfo(NamedTuple):
     num_classes: int
     task: Literal["regression", "classification", "multilabel"]
 
