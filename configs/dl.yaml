@@ -1,0 +1,67 @@
+seed: 42
+data_dir: /scratch/SCRATCH_SAS/roman/SSN/
+root_dir: /scratch/SCRATCH_SAS/roman/SSN/data
+dataset-name:
+  - Immunogenicity
+  - Glycosylation
+  - Taxonomy_Domain
+  - Taxonomy_Phylum
+  - Taxonomy_Class
+  - Taxonomy_Order
+  - Taxonomy_Family
+  - Taxonomy_Genus
+  - Taxonomy_Species
+model:
+  - name: mlp
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 3
+    epochs: 100
+    patience: 30
+    learning_rate: 0
+    optimizer: Adam
+    featurization:
+      - name: mlp
+  - name: sweetnet
+    hidden_dim: 128
+    batch_size: 256
+    epochs: 50
+    patience: 30
+    learning_rate: 0.001
+    optimizer: Adam
+    featurization:
+      - name: sweetnet
+  - name: gnngly
+    hidden_dim: 14
+    batch_size: 256
+    num_layers: 5
+    epochs: 200
+    patience: 30
+    learning_rate: 0
+    optimizer: Adam
+    featurization:
+      - name: gnngly
+  - name: ssn
+    hidden_dim: 128
+    batch_size: 32
+    num_layers: 3
+    epochs: 100
+    learning_rate: 0.001
+    optimizer: Adam
+    featurization:
+      - name: clean
+      - name: scalar
+        level: atoms
+        embed_dim: 128
+        index: 0
+        mode: random
+      - name: scalar
+        level: bonds
+        embed_dim: 128
+        index: 0
+        mode: random
+      - name: scalar
+        level: monosacchs
+        embed_dim: 128
+        index: 0
+        mode: random

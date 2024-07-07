@@ -1,9 +1,16 @@
 seed: 42
-data_dir: /scratch/SCRATCH_SAS/roman/SSN
+data_dir: /scratch/SCRATCH_SAS/roman/SSN/
 root_dir: /scratch/SCRATCH_SAS/roman/SSN/data
 dataset-name:
   - Immunogenicity
   - Glycosylation
+  - Taxonomy_Domain
+  - Taxonomy_Phylum
+  - Taxonomy_Class
+  - Taxonomy_Order
+  - Taxonomy_Family
+  - Taxonomy_Genus
+  - Taxonomy_Species
 model:
   - name: rf
     n_estimators: 500
@@ -16,3 +23,8 @@ model:
     random_state: 42
     featurization:
       - name: mlp
+  - name: xgb
+    random_state: 42
+    featurization:
+      - name: mlp
+
