@@ -72,6 +72,7 @@ class GNNGLYTransform(RootTransform):
         self.hybridization_embed = torch.eye(5)
 
     def __call__(self, data):
+        data["atoms"]["x"][:, 0] = data["atoms"]["x"][:, 0].clamp(max=100)
         atom_type_embed = self.atom_type_embed[data["atoms"]["x"][:, 0]]
         chiral_embed = torch.stack([self.chiral_embed[chiral] for chiral in data["atoms"]["x"][:, 1]])
         degree_embed = self.degree_embed[data["atoms"]["x"][:, 2]]
@@ -101,7 +102,10 @@ class MLPTransform(RootTransform):
 
 class SweetNetTransform(RootTransform):
     def __call__(self, data):
-        d = from_networkx(glycan_to_nxGraph(data["IUPAC"], lib))
+        try:
+            d = from_networkx(glycan_to_nxGraph(data["IUPAC"], lib))
+        except:
+            d = from_networkx(glycan_to_nxGraph("Gal", lib))
         data["atoms"]["x"] = torch.tensor(d["labels"]).reshape(-1, 1)
         data["atoms"]["num_nodes"] = len(data["atoms"]["x"])
         data["atoms", "coboundary", "atoms"]["edge_index"] = d.edge_index

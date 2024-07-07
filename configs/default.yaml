@@ -2,23 +2,6 @@ dataset-name: Taxonomy_Subdomain
 seed: 42
 data_dir: ./
 root_dir: ./data
-featurization:
-  - name: clean
-  - name: scalar
-    level: atoms
-    embed_dim: 128
-    index: 0
-    mode: random
-  - name: scalar
-    level: bonds
-    embed_dim: 128
-    index: 0
-    mode: random
-  - name: scalar
-    level: monosacchs
-    embed_dim: 128
-    index: 0
-    mode: random
 model:
   name: ssn
   hidden_dim: 128
@@ -27,3 +10,20 @@ model:
   epochs: 100
   learning_rate: 0.001
   optimizer: Adam
+  featurization:
+    - name: clean
+    - name: scalar
+      level: atoms
+      embed_dim: 128
+      index: 0
+      mode: random
+    - name: scalar
+      level: bonds
+      embed_dim: 128
+      index: 0
+      mode: random
+    - name: scalar
+      level: monosacchs
+      embed_dim: 128
+      index: 0
+      mode: random

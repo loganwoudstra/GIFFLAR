@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Literal
 
 from glycowork.glycan_data.loader import lib
 from pytorch_lightning import LightningModule
@@ -28,7 +28,7 @@ def get_gin_layer(hidden_dim: int):
 
 
 class GlycanGIN(LightningModule):
-    def __init__(self, hidden_dim: int, num_layers: int = 3):
+    def __init__(self, hidden_dim: int, num_layers: int, task: Literal["regression", "classification", "multilabel"]):
         super().__init__()
         self.embedding = {
             "atoms": nn.Embedding(len(atom_map) + 1, hidden_dim),
@@ -50,6 +50,8 @@ class GlycanGIN(LightningModule):
 
         self.pooling = global_mean_pool
 
+        self.task = task
+
     def forward(self, batch):
         for conv in self.convs:
             batch.x_dict = conv(batch.x_dict, batch.edge_index_dict)
@@ -61,8 +63,8 @@ class GlycanGIN(LightningModule):
 
 
 class DownstreamGGIN(GlycanGIN):
-    def __init__(self, hidden_dim: int, output_dim: int, num_layers: int = 3, batch_size: int = 32, **kwargs):
-        super().__init__(hidden_dim, num_layers)
+    def __init__(self, hidden_dim: int, output_dim: int, task: Literal["regression", "classification", "multilabel"], num_layers: int = 3, batch_size: int = 32, **kwargs):
+        super().__init__(hidden_dim, num_layers, task)
 
         self.head = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim // 2),
@@ -76,11 +78,13 @@ class DownstreamGGIN(GlycanGIN):
             self.loss = nn.BCEWithLogitsLoss()
         else:
             self.loss = nn.CrossEntropyLoss()
-        self.metrics = get_metrics(None, output_dim)
+        self.metrics = get_metrics(self.task, output_dim)
 
     def forward(self, batch):
         node_embed, graph_embed = super().forward(batch)
         pred = self.head(graph_embed)
+        if list(pred.shape) == [len(batch["y"]), 1]:
+            pred = pred[:, 0]
         return {
             "node_embed": node_embed,
             "graph_embed": graph_embed,

@@ -62,11 +62,14 @@ def fit(**kwargs):
 
 
 def train(**kwargs):
+    if (kwargs["model"]["name"], kwargs["dataset-name"]) in {("mlp", "Immunogenicity"), ("sweetnet", "Immunogenicity")}:
+        return
+
     seed_everything(kwargs["seed"])
     data_config = get_dataset(kwargs["dataset-name"])
     datamodule = DownsteamGDM(root=kwargs["root_dir"], filename=data_config["filepath"],
                               batch_size=kwargs["model"]["batch_size"], **kwargs)
-    model = MODELS[kwargs["model"]["name"]](output_dim=data_config["num_classes"], **kwargs["model"])
+    model = MODELS[kwargs["model"]["name"]](output_dim=data_config["num_classes"], task=data_config["task"], **kwargs["model"])
     logger = CSVLogger("logs", name=kwargs["model"]["name"])
     logger.log_hyperparams(kwargs)
     trainer = Trainer(
@@ -124,10 +127,10 @@ if __name__ == '__main__':
     parser.add_argument("config", type=str, help="Path to YAML config file")
     custom_args = read_yaml_config(parser.parse_args().config)
     for args in unfold_config(custom_args):
-        try:
-            if args["model"]["name"] in ["rf", "svm", "xgb"]:
-                fit(**args)
-            else:
-                train(**args)
-        except Exception as e:
-            print(f"Error: {e}")
+        # try:
+        if args["model"]["name"] in ["rf", "svm", "xgb"]:
+            fit(**args)
+        else:
+            train(**args)
+        # except Exception as e:
+        #     print(f"Error: {e}")

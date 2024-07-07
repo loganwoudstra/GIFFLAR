@@ -18,8 +18,8 @@ hidden_dim:      14
 
 
 class GNNGLY(DownstreamGGIN):
-    def __init__(self, output_dim, **kwargs):
-        super().__init__(14, output_dim)
+    def __init__(self, output_dim, task, **kwargs):
+        super().__init__(14, output_dim, task)
 
         self.layers = [
             GCNConv(133, 14),
@@ -49,6 +49,8 @@ class GNNGLY(DownstreamGGIN):
 
         graph_embed = self.pooling(x, batch_ids)
         pred = self.head(graph_embed)
+        if list(pred.shape) == [len(batch["y"]), 1]:
+            pred = pred[:, 0]
         return {
             "node_embed": x,
             "graph_embed": graph_embed,

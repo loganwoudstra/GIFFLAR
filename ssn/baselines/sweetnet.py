@@ -6,8 +6,8 @@ from ssn.model import DownstreamGGIN
 
 
 class SweetNetLightning(DownstreamGGIN):
-    def __init__(self, hidden_dim: int, output_dim: int, **kwargs):
-        super().__init__(hidden_dim, output_dim)
+    def __init__(self, hidden_dim: int, output_dim: int, task, **kwargs):
+        super().__init__(hidden_dim, output_dim, task)
 
         self.model = prep_model("SweetNet", output_dim, hidden_dim=hidden_dim)
 
