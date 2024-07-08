@@ -62,7 +62,7 @@ def fit(**kwargs):
 
 
 def train(**kwargs):
-    if (kwargs["model"]["name"], kwargs["dataset-name"]) in {("mlp", "Immunogenicity"), ("sweetnet", "Immunogenicity")}:
+    if kwargs["dataset-name"] in {"Immunogenicity", "Glycosylation"}:
         return
 
     seed_everything(kwargs["seed"])
@@ -78,6 +78,7 @@ def train(**kwargs):
             RichModelSummary(),
             RichProgressBar(),
         ],
+        accelerator="cpu",
         max_epochs=kwargs["model"]["epochs"],
         logger=logger
     )
@@ -119,6 +120,7 @@ def unfold_config(config):
             tmp_config = copy.deepcopy(config)
             tmp_config["dataset-name"] = dataset_name
             tmp_config["model"] = model
+            print(dataset_name, "\t", model)
             yield tmp_config
 
 

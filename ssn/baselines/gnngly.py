@@ -40,10 +40,15 @@ class GNNGLY(DownstreamGGIN):
         )
 
     def forward(self, batch):
+        batch = batch.to(self.device)
         x = batch.x_dict["atoms"]
         batch_ids = batch.batch_dict["atoms"]
         edge_index = batch.edge_index_dict["atoms", "coboundary", "atoms"]
 
+        # print(x.device)
+        # print(self.device)
+        # print(self.head.device)
+        
         for layer in self.layers:
             x = layer(x, edge_index)
 

@@ -99,6 +99,10 @@ class HeteroDataBatch:
         for k, v in self.__dict__.items():
             if hasattr(v, "to"):
                 setattr(self, k, v.to(device))
+            elif isinstance(v, dict):
+                for key, value in v.items():
+                    if hasattr(value, "to"):
+                        value = value.to(device)
         return self
 
     def __getitem__(self, item):
@@ -151,7 +155,7 @@ def hetero_collate(data):
 
 class GlycanStorage:
     def __init__(self, path: Optional[Path] = None):
-        self.path = (path or Path("data")) / "glycan_storage.pkl"
+        self.path = Path(path or Path("data")) / "glycan_storage.pkl"
         self.data = self._load()
 
     def close(self):
@@ -287,7 +291,7 @@ class DownstreamGDs(GlycanDataset):
     def process(self):
         data = {k: [] for k in self.splits}
         df = pd.read_csv(self.filename, sep="\t")
-        gs = GlycanStorage()
+        gs = GlycanStorage(self.root)
         for index, (_, row) in tqdm(enumerate(df.iterrows())):
             try:
                 d = gs.query(row["glycan"])
