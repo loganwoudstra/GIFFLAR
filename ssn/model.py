@@ -5,7 +5,6 @@ from pytorch_lightning import LightningModule
 import torch
 from torch import nn
 from torch_geometric.nn import GINConv, HeteroConv, global_mean_pool
-from torchmetrics import Accuracy, MetricCollection, MatthewsCorrCoef, AUROC
 
 from ssn.utils import atom_map, bond_map, get_metrics
 
@@ -31,9 +30,9 @@ class GlycanGIN(LightningModule):
     def __init__(self, hidden_dim: int, num_layers: int, task: Literal["regression", "classification", "multilabel"]):
         super().__init__()
         self.embedding = {
-            "atoms": nn.Embedding(len(atom_map) + 1, hidden_dim),
-            "bonds": nn.Embedding(len(bond_map) + 1, hidden_dim),
-            "monosacchs": nn.Embedding(len(lib) + 1, hidden_dim),
+            "atoms": nn.Embedding(len(atom_map) + 2, hidden_dim),
+            "bonds": nn.Embedding(len(bond_map) + 2, hidden_dim),
+            "monosacchs": nn.Embedding(len(lib) + 2, hidden_dim),
         }
 
         self.convs = torch.nn.ModuleList()
@@ -53,6 +52,8 @@ class GlycanGIN(LightningModule):
         self.task = task
 
     def forward(self, batch):
+        for key in batch.x_dict.keys():
+            batch.x_dict[key] = self.embedding[key](batch.x_dict[key])
         for conv in self.convs:
             batch.x_dict = conv(batch.x_dict, batch.edge_index_dict)
 
@@ -65,25 +66,33 @@ class GlycanGIN(LightningModule):
 class DownstreamGGIN(GlycanGIN):
     def __init__(self, hidden_dim: int, output_dim: int, task: Literal["regression", "classification", "multilabel"], num_layers: int = 3, batch_size: int = 32, **kwargs):
         super().__init__(hidden_dim, num_layers, task)
+        self.output_dim = output_dim
 
         self.head = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.PReLU(),
             nn.Dropout(0.2),
-            nn.Linear(hidden_dim // 2, output_dim)
+            nn.Linear(hidden_dim // 2, self.output_dim)
         )
+        if self.task == "multilabel":
+            self.sigmoid = nn.Sigmoid()
+
         self.batch_size = batch_size
 
-        if output_dim == 1:
+        if task == "regression":
+            self.loss = nn.MSELoss()
+        elif self.output_dim == 1:
             self.loss = nn.BCEWithLogitsLoss()
+        elif self.task == "multilabel":
+            self.loss = nn.BCELoss()
         else:
             self.loss = nn.CrossEntropyLoss()
-        self.metrics = get_metrics(self.task, output_dim)
+        self.metrics = get_metrics(self.task, self.output_dim)
 
     def forward(self, batch):
         node_embed, graph_embed = super().forward(batch)
         pred = self.head(graph_embed)
-        if list(pred.shape) == [len(batch["y"]), 1]:
+        if self.task != "multilabel" and list(pred.shape) == [len(batch["y"]), 1]:
             pred = pred[:, 0]
         return {
             "node_embed": node_embed,
@@ -91,22 +100,38 @@ class DownstreamGGIN(GlycanGIN):
             "preds": pred,
         }
 
-    def shared_step(self, batch, batch_idx, stage: str):
+    def shared_step(self, batch, stage: str):
         fwd_dict = self.forward(batch)
-        fwd_dict["labels"] = batch["y"]
-        fwd_dict["loss"] = self.loss(fwd_dict["preds"], fwd_dict["labels"])
-        self.metrics[stage].update(fwd_dict["preds"], fwd_dict["labels"])
+        fwd_dict["labels"] = batch["y_oh"] if self.task == "multilabel" else batch["y"]
+        if self.task == "multilabel":
+            fwd_dict["preds"] = self.sigmoid(fwd_dict["preds"])
+
+        if self.output_dim == 1 or self.task == "multilabel":
+            fwd_dict["loss"] = self.loss(fwd_dict["preds"], fwd_dict["labels"].reshape(fwd_dict["preds"].shape).float())
+        elif self.task == "classification":
+            fwd_dict["loss"] = self.loss(fwd_dict["preds"], fwd_dict["labels"].reshape(fwd_dict["preds"].shape[:-1]))
+        else:
+            fwd_dict["loss"] = self.loss(fwd_dict["preds"], fwd_dict["labels"])
+
+        if self.task == "regression":
+            self.metrics[stage].update(fwd_dict["preds"], fwd_dict["labels"].reshape(fwd_dict["preds"].shape))
+        else:
+            if self.output_dim == 1 or self.task == "multilabel":
+                self.metrics[stage].update(fwd_dict["preds"], fwd_dict["labels"].reshape(fwd_dict["preds"].shape))
+            else:
+                self.metrics[stage].update(fwd_dict["preds"], fwd_dict["labels"].reshape(fwd_dict["preds"].shape[:-1]))
+
         self.log(f"{stage}/loss", fwd_dict["loss"], batch_size=self.batch_size)
         return fwd_dict
 
-    def training_step(self, batch, batch_idx):
-        return self.shared_step(batch, batch_idx, "train")
+    def training_step(self, batch):
+        return self.shared_step(batch, "train")
 
-    def validation_step(self, batch, batch_idx):
-        return self.shared_step(batch, batch_idx, "val")
+    def validation_step(self, batch):
+        return self.shared_step(batch, "val")
 
-    def test_step(self, batch, batch_idx):
-        return self.shared_step(batch, batch_idx, "test")
+    def test_step(self, batch):
+        return self.shared_step(batch, "test")
 
     def shared_end(self, stage: str):
         metrics = self.metrics[stage].compute()

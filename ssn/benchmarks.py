@@ -37,6 +37,7 @@ def get_taxonomic_level(level):
     if not (p := Path(f"taxonomy_{level}.tsv")).exists():
         tax = get_taxonomy()[["glycan", level]]
         tax = tax[~tax[level].isna()]
+        tax.rename(columns={"glycan": "IUPAC"}, inplace=True)
         tax["label"] = list(np.array(pd.get_dummies(tax[level]), dtype=int))
         tax = tax.sample(frac=1)
         tax["split"] = np.random.choice(["train", "val", "test"], tax.shape[0], p=[0.7, 0.2, 0.1])
@@ -51,7 +52,7 @@ def get_immunogenicity():
             "immunogenicity.csv"
         )
         df = pd.read_csv("immunogenicity.csv")[["glycan", "immunogenicity"]]
-        df.rename(columns={"immunogenicity": "label"}, inplace=True)
+        df.rename(columns={"glycan": "IUPAC"}, inplace=True)
         df["split"] = np.random.choice(["train", "val", "test"], df.shape[0], p=[0.7, 0.2, 0.1])
         df.to_csv(p, sep="\t", index=False)
     return p
@@ -64,6 +65,7 @@ def get_glycosylation():
             "glycosylation.csv"
         )
         df = pd.read_csv("glycosylation.csv")[["glycan", "link"]]
+        df.rename(columns={"glycan": "IUPAC"}, inplace=True)
         df.dropna(inplace=True)
         df["label"] = list(np.array(pd.get_dummies(df["link"]), dtype=int))
         df["split"] = np.random.choice(["train", "val", "test"], df.shape[0], p=[0.7, 0.2, 0.1])
@@ -86,22 +88,26 @@ taxonomy_classes: Dict[str, RawDataInfo] = {
 }
 
 
-def get_dataset(dataset_name) -> DatasetInfo:
-    name_fracs = dataset_name.split("_")
+def get_dataset(data_config) -> Dict:
+    name_fracs = data_config["name"].split("_")
     match name_fracs[0]:
         case "Taxonomy":
             path = get_taxonomic_level(name_fracs[1])
-            n_classes, task = taxonomy_classes[name_fracs[1]]
         case "Immunogenicity":
             path = get_immunogenicity()
-            n_classes, task = taxonomy_classes["Immunogenicity"]
         case "Glycosylation":
             path = get_glycosylation()
-            n_classes, task = taxonomy_classes["Glycosylation"]
-        case _:
-            raise ValueError(f"Unknown dataset {dataset_name}.")
-    return {
-        "filepath": path,
-        "num_classes": n_classes,
-        "task": task
-    }
+        case "class-1" | "class-n" | "multilabel" | "reg-1" | "reg-n":
+            path = Path("dummy_data") / f"{name_fracs[0].replace('-', '_')}.csv"
+        case _:  # Unknown dataset
+            raise ValueError(f"Unknown dataset {data_config['name']}.")
+    if data_config["task"] in {"regression", "multilabel"}:
+        data_config["num_classes"] = len(data_config["label"])
+    else:
+        data_config["num_classes"] = int(pd.read_csv(
+            path, sep="\t" if path.suffix.lower().endswith(".tsv") else ","
+        )[data_config["label"]].values.max() + 1)
+        if data_config["num_classes"] == 2:
+            data_config["num_classes"] = 1
+    data_config["filepath"] = path
+    return data_config

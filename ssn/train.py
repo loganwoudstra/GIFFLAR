@@ -14,6 +14,7 @@ from ssn.baselines.sweetnet import SweetNetLightning
 from ssn.data import DownsteamGDM
 from ssn.benchmarks import get_dataset
 from ssn.model import DownstreamGGIN
+from ssn.pretransforms import get_pretransforms
 from ssn.utils import get_sl_model, get_metrics
 
 MODELS = {
@@ -24,20 +25,30 @@ MODELS = {
 }
 
 
-def fit(**kwargs):
+def setup(**kwargs):
     seed_everything(kwargs["seed"])
-    data_config = get_dataset(kwargs["dataset-name"])
-    datamodule = DownsteamGDM(root=kwargs["root_dir"], filename=data_config["filepath"], batch_size=1, **kwargs)
+    data_config = get_dataset(kwargs["dataset"])
+    datamodule = DownsteamGDM(
+        root=kwargs["root_dir"], filename=data_config["filepath"], batch_size=kwargs["model"].get("batch_size", 1),
+        transform=None, pre_transform=get_pretransforms(), **data_config
+    )
     logger = CSVLogger("logs", name=kwargs["model"]["name"])
     logger.log_hyperparams(kwargs)
-    model = get_sl_model(kwargs["model"]["name"], data_config["task"], data_config["num_classes"], **kwargs)
     metrics = get_metrics(data_config["task"], data_config["num_classes"])
+    return data_config, datamodule, logger, metrics
 
+
+def fit(**kwargs):
+    return
+    data_config, datamodule, logger, metrics = setup(**kwargs)
+    model = get_sl_model(kwargs["model"]["name"], data_config["task"], data_config["num_classes"], **kwargs)
     train_X, train_y, train_yoh = datamodule.train.to_statistical_learning()
     if data_config["task"] == "classification" and data_config["num_classes"] > 2:
         model.fit(train_X, train_yoh)
     else:
         model.fit(train_X, train_y)
+
+    print("Fitted", kwargs["model"]["name"])
 
     for X, y, yoh, name in [
         (train_X, train_y, train_yoh, "train"),
@@ -62,16 +73,16 @@ def fit(**kwargs):
 
 
 def train(**kwargs):
-    if kwargs["dataset-name"] in {"Immunogenicity", "Glycosylation"}:
-        return
-
-    seed_everything(kwargs["seed"])
-    data_config = get_dataset(kwargs["dataset-name"])
-    datamodule = DownsteamGDM(root=kwargs["root_dir"], filename=data_config["filepath"],
-                              batch_size=kwargs["model"]["batch_size"], **kwargs)
-    model = MODELS[kwargs["model"]["name"]](output_dim=data_config["num_classes"], task=data_config["task"], **kwargs["model"])
-    logger = CSVLogger("logs", name=kwargs["model"]["name"])
-    logger.log_hyperparams(kwargs)
+    # seed_everything(kwargs["seed"])
+    # data_config = kwargs["dataset"]
+    # data_config["filepath"] = get_dataset(data_config["name"])
+    # datamodule = DownsteamGDM(root=kwargs["root_dir"], filename=data_config["filepath"],
+    #                           batch_size=kwargs["model"]["batch_size"], **data_config)
+    # logger = CSVLogger("logs", name=kwargs["model"]["name"])
+    # logger.log_hyperparams(kwargs)
+    data_config, datamodule, logger, _ = setup(**kwargs)
+    model = MODELS[kwargs["model"]["name"]](output_dim=data_config["num_classes"], task=data_config["task"],
+                                            **kwargs["model"])
     trainer = Trainer(
         callbacks=[
             # ModelCheckpoint(save_last=True, mode="min", monitor="val/reg/loss", save_top_k=1),
@@ -103,11 +114,11 @@ def merge_dicts(a: dict, b: dict):
 
 
 def unfold_config(config):
-    if isinstance(config["dataset-name"], str):
-        dataset_names = [config["dataset-name"]]
+    if isinstance(config["datasets"], dict):
+        datasets = [config["datasets"]]
     else:
-        dataset_names = config["dataset-name"]
-    del config["dataset-name"]
+        datasets = config["datasets"]
+    del config["datasets"]
 
     if isinstance(config["model"], dict):
         models = [config["model"]]
@@ -115,12 +126,13 @@ def unfold_config(config):
         models = config["model"]
     del config["model"]
 
-    for dataset_name in dataset_names:
+    for dataset in datasets:
         for model in models:
             tmp_config = copy.deepcopy(config)
-            tmp_config["dataset-name"] = dataset_name
+            tmp_config["dataset"] = dataset
+            if not isinstance(tmp_config["dataset"]["label"], list):
+                tmp_config["dataset"]["label"] = [tmp_config["dataset"]["label"]]
             tmp_config["model"] = model
-            print(dataset_name, "\t", model)
             yield tmp_config
 
 
@@ -129,10 +141,7 @@ if __name__ == '__main__':
     parser.add_argument("config", type=str, help="Path to YAML config file")
     custom_args = read_yaml_config(parser.parse_args().config)
     for args in unfold_config(custom_args):
-        # try:
         if args["model"]["name"] in ["rf", "svm", "xgb"]:
             fit(**args)
         else:
             train(**args)
-        # except Exception as e:
-        #     print(f"Error: {e}")

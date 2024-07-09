@@ -15,8 +15,9 @@ import glyles
 from glyles.glycans.factory.factory import MonomerFactory
 from tqdm import tqdm
 
-from ssn.pretransforms import assemble_transforms
-from ssn.utils import S3NMerger, nx2mol, bond_map, lib_map
+from ssn.utils import S3NMerger, nx2mol
+
+Chem.SetDefaultPickleProperties(Chem.PropertyPickleOptions.AllProps)
 
 
 def iupac2mol(iupac: str = "Fuc(a1-4)Gal(a1-4)Glc"):
@@ -30,58 +31,15 @@ def iupac2mol(iupac: str = "Fuc(a1-4)Gal(a1-4)Glc"):
         rdDepictor.Compute2DCoords(mol)
     Chem.WedgeMolBonds(mol, mol.GetConformer())
 
-    data = HeteroData()
-    data["IUPAC"] = iupac
-    data["smiles"] = Chem.MolToSmiles(mol)
-    if len(data["smiles"]) < 10:
+    smiles = Chem.MolToSmiles(mol)
+    if len(smiles) < 10:
         return None
 
-    data["atoms"].x = torch.tensor([[
-        atom.GetAtomicNum(),
-        atom.GetChiralTag(),
-        atom.GetDegree(),
-        atom.GetFormalCharge(),
-        len(atom.GetBonds()),
-        atom.GetHybridization(),
-    ] for atom in mol.GetAtoms()])
-    data["atoms"].num_nodes = len(data["atoms"].x)
-    data["bonds"].x = []
-    data["atoms", "coboundary", "atoms"].edge_index = []
-    data["atoms", "to", "bonds"].edge_index = []
-    data["bonds", "to", "monosacchs"].edge_index = []
-    for bond in mol.GetBonds():
-        data["bonds"].x.append([
-            bond_map.get(bond.GetBondType(), 0),
-            bond.IsInRing(),
-            bond.GetIsConjugated(),
-            bond.GetBondDir(),
-        ])
-        data["atoms", "coboundary", "atoms"].edge_index += [(bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()),
-                                                            (bond.GetEndAtomIdx(), bond.GetBeginAtomIdx())]
-        data["atoms", "to", "bonds"].edge_index += [(bond.GetBeginAtomIdx(), bond.GetIdx()),
-                                                    (bond.GetEndAtomIdx(), bond.GetIdx())]
-        data["bonds", "to", "monosacchs"].edge_index.append((bond.GetIdx(), bond.GetIntProp("mono_id")))
-    data["bonds"].x = torch.tensor(data["bonds"].x)
-    data["bonds"].num_nodes = len(data["bonds"].x)
-    data["atoms", "coboundary", "atoms"].edge_index = torch.tensor(data["atoms", "coboundary", "atoms"].edge_index, dtype=torch.long).T
-    data["atoms", "to", "bonds"].edge_index = torch.tensor(data["atoms", "to", "bonds"].edge_index, dtype=torch.long).T
-    data["bonds", "to", "monosacchs"].edge_index = torch.tensor(data["bonds", "to", "monosacchs"].edge_index, dtype=torch.long).T
-    data["bonds", "boundary", "bonds"].edge_index = torch.tensor(
-        [(bond1.GetIdx(), bond2.GetIdx()) for atom in mol.GetAtoms() for bond1 in atom.GetBonds() for bond2 in
-         atom.GetBonds() if bond1.GetIdx() != bond2.GetIdx()], dtype=torch.long).T
-    # TODO: Adjust to glycan-informed molecule
-    data["bonds", "coboundary", "bonds"].edge_index = torch.tensor(
-        [(bond1, bond2) for ring in mol.GetRingInfo().BondRings() for bond1 in ring for bond2 in ring if
-         bond1 != bond2], dtype=torch.long).T
-    data["monosacchs"].x = torch.tensor([[
-        lib_map.get(tree.nodes[node]["type"].name, len(lib_map)),
-    ] for node in tree.nodes])
-    data["monosacchs"].num_nodes = len(data["monosacchs"].x)
-    data["monosacchs", "boundary", "monosacchs"].edge_index = []
-    for a, b in tree.edges:
-        data["monosacchs", "boundary", "monosacchs"].edge_index += [(a, b), (b, a)]
-    data["monosacchs", "boundary", "monosacchs"].edge_index = torch.tensor(
-        data["monosacchs", "boundary", "monosacchs"].edge_index, dtype=torch.long).T
+    data = HeteroData()
+    data["IUPAC"] = iupac
+    data["smiles"] = smiles
+    data["mol"] = mol
+    data["tree"] = tree
     return data
 
 
@@ -102,7 +60,7 @@ class HeteroDataBatch:
             elif isinstance(v, dict):
                 for key, value in v.items():
                     if hasattr(value, "to"):
-                        value = value.to(device)
+                        v[key] = value.to(device)
         return self
 
     def __getitem__(self, item):
@@ -110,17 +68,23 @@ class HeteroDataBatch:
 
 
 def hetero_collate(data):
-    node_types = data[0].node_types
+    if isinstance(data[0], list):
+        data = data[0]
+    # Samples -> Batch
+    node_types = [t for t in data[0].node_types if len(data[0][t]) > 0]
     edge_types = data[0].edge_types
     x_dict = {}
     batch_dict = {}
     edge_index_dict = {}
     edge_attr_dict = {}
-    kwargs = {key: [] for key in dict(data[0])}
-    node_counts = {node_type: [0] + [] for node_type in node_types}
+    baselines = {"gnngly", "sweetnet"}
+    kwargs = {key: [] for key in dict(data[0]) if all(b not in key for b in baselines)}
+    node_counts = {node_type: [0] for node_type in node_types}
     for d in data:
         for key in kwargs:
-            if len(d[key]) != 0:
+            # The following does not work, because NodeStorage reports to not have len, but one can run len(NodeStorage)
+            if not hasattr(d[key], "__len__") or len(d[key]) != 0:
+                # if getattr(d[key], "len", 0) != 0:
                 kwargs[key].append(d[key])
         for node_type in node_types:
             node_counts[node_type].append(node_counts[node_type][-1] + d[node_type].num_nodes)
@@ -142,12 +106,26 @@ def hetero_collate(data):
         edge_index_dict[edge_type] = torch.cat(tmp_edge_index, dim=1)
         if len(tmp_edge_attr) != 0:
             edge_attr_dict[edge_type] = torch.cat(tmp_edge_attr, dim=0)
+
+    for b in baselines:
+        kwargs[f"{b}_x"] = torch.cat([d[f"{b}_x"] for d in data], dim=0)
+        edges = []
+        batch = []
+        node_counts = 0
+        for i, d in enumerate(data):
+            edges.append(d[f"{b}_edge_index"] + node_counts)
+            node_counts += d[f"{b}_num_nodes"]
+            batch.append(torch.full((d[f"{b}_num_nodes"],), i, dtype=torch.long))
+        kwargs[f"{b}_edge_index"] = torch.cat(edges, dim=1)
+        kwargs[f"{b}_batch"] = torch.cat(batch, dim=0)
+
     num_nodes = {node_type: x_dict[node_type].shape[0] for node_type in node_types}
     for key, value in list(kwargs.items()):
-        if len(value) != len(data):
-            del kwargs[key]
+        if any(key.startswith(b) for b in baselines):
             continue
-        if isinstance(value[0], torch.Tensor):
+        elif len(value) != len(data):
+            del kwargs[key]
+        elif isinstance(value[0], torch.Tensor):
             kwargs[key] = torch.cat(value, dim=0)
     return HeteroDataBatch(x_dict=x_dict, edge_index_dict=edge_index_dict, edge_attr_dict=edge_attr_dict,
                            num_nodes=num_nodes, batch_dict=batch_dict, **kwargs)
@@ -155,7 +133,7 @@ def hetero_collate(data):
 
 class GlycanStorage:
     def __init__(self, path: Optional[Path] = None):
-        self.path = Path(path or Path("data")) / "glycan_storage.pkl"
+        self.path = Path(path or "data") / "glycan_storage.pkl"
         self.data = self._load()
 
     def close(self):
@@ -164,7 +142,10 @@ class GlycanStorage:
 
     def query(self, iupac):
         if iupac not in self.data:
-            self.data[iupac] = iupac2mol(iupac)
+            try:
+                self.data[iupac] = iupac2mol(iupac)
+            except:
+                self.data[iupac] = None
         return copy.deepcopy(self.data[iupac])
 
     def _load(self):
@@ -180,7 +161,7 @@ class GlycanDataModule(LightningDataModule):
         self.batch_size = batch_size
 
     def train_dataloader(self):
-        return DataLoader(self.train, batch_size=min(self.batch_size, len(self.train)), shuffle=True, collate_fn=hetero_collate)
+        return DataLoader(self.train, batch_size=min(self.batch_size, len(self.train)), shuffle=True , collate_fn=hetero_collate)
 
     def val_dataloader(self):
         return DataLoader(self.val, batch_size=min(self.batch_size, len(self.val)), shuffle=False, collate_fn=hetero_collate)
@@ -190,23 +171,24 @@ class GlycanDataModule(LightningDataModule):
 
 
 class PretrainGDM(GlycanDataModule):
-    def __init__(self, root: str | Path, filename: str | Path, batch_size: int = 64, train_frac: float = 0.8):
+    def __init__(self, root: str | Path, filename: str | Path, batch_size: int = 64, train_frac: float = 0.8, **kwargs):
         super().__init__(batch_size)
-        ds = PretrainGDs(root=root, filename=filename)
+        ds = PretrainGDs(root=root, filename=filename, **kwargs)
         self.train, self.val = torch.utils.data.dataset.random_split(ds, [train_frac, 1 - train_frac])
 
 
 class DownsteamGDM(GlycanDataModule):
-    def __init__(self, root, filename, batch_size, **kwargs):
+    def __init__(self, root, filename, batch_size, transform, pre_transform, **dataset_args):
         super().__init__(batch_size)
-        pre_transform, transform = assemble_transforms(**kwargs)
-        print(pre_transform, "\n", transform)
-        self.train = DownstreamGDs(root=root, filename=filename, split="train", name=kwargs["model"]["name"],
-                                   transform=transform, pre_transform=pre_transform)
-        self.val = DownstreamGDs(root=root, filename=filename, split="val",  name=kwargs["model"]["name"],
-                                 transform=transform, pre_transform=pre_transform)
-        self.test = DownstreamGDs(root=root, filename=filename, split="test",  name=kwargs["model"]["name"],
-                                  transform=transform, pre_transform=pre_transform)
+        self.train = DownstreamGDs(
+            root=root, filename=filename, split="train", transform=transform, pre_transform=pre_transform, **dataset_args
+        )
+        self.val = DownstreamGDs(
+            root=root, filename=filename, split="val", transform=transform, pre_transform=pre_transform, **dataset_args
+        )
+        self.test = DownstreamGDs(
+            root=root, filename=filename, split="test", transform=transform, pre_transform=pre_transform, **dataset_args
+        )
 
 
 class GlycanDataset(InMemoryDataset):
@@ -214,14 +196,25 @@ class GlycanDataset(InMemoryDataset):
             self,
             root: str | Path,
             filename: str | Path,
-            name: str,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
             path_idx: int = 0,
+            **dataset_args,
     ):
+        # Removed slices from collate, saving and loading. Might be unnecessary?
         self.filename = Path(filename)
-        super().__init__(root=str(Path(root) / filename.stem / name), transform=transform, pre_transform=pre_transform)
-        self.data, self.slices = torch.load(self.processed_paths[path_idx])
+        self.dataset_args = dataset_args
+        super().__init__(root=str(Path(root) / filename.stem), transform=transform, pre_transform=pre_transform)
+        self.data = torch.load(self.processed_paths[path_idx])
+
+    def __len__(self):
+        return self.data.__len__()
+
+    def len(self):
+        return len(self)
+
+    def __getitem__(self, item):
+        return self.data[item]
 
     @property
     def processed_paths(self) -> List[str]:
@@ -233,8 +226,7 @@ class GlycanDataset(InMemoryDataset):
         if self.pre_transform is not None:
             data = [self.pre_transform(d) for d in data]
 
-        data, slices = self.collate(data)
-        torch.save((data, slices), self.processed_paths[path_idx])
+        torch.save(data, self.processed_paths[path_idx])
 
 
 class PretrainGDs(GlycanDataset):
@@ -242,11 +234,11 @@ class PretrainGDs(GlycanDataset):
             self,
             root: str | Path,
             filename: str | Path,
-            name: str,
             transform: Optional[Callable] = None,
-            pre_transform: Optional[Callable] = None
+            pre_transform: Optional[Callable] = None,
+            **dataset_args
     ):
-        super().__init__(root=root, filename=filename, name=name, transform=transform, pre_transform=pre_transform)
+        super().__init__(root=root, filename=filename, transform=transform, pre_transform=pre_transform, **dataset_args)
 
     @property
     def processed_file_names(self) -> Union[str, List[str], Tuple[str, ...]]:
@@ -266,14 +258,12 @@ class DownstreamGDs(GlycanDataset):
             root: str | Path,
             filename: str | Path,
             split: str,
-            name: str,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
+            **dataset_args
     ):
-        if name in ["rf", "svm", "xgb"]:
-            name = "mlp"
-        super().__init__(root=root, filename=filename, name=name, transform=transform, pre_transform=pre_transform,
-                         path_idx=self.splits[split])
+        super().__init__(root=root, filename=filename, transform=transform, pre_transform=pre_transform,
+                         path_idx=self.splits[split], **dataset_args)
 
     @property
     def processed_file_names(self) -> Union[str, List[str], Tuple[str, ...]]:
@@ -281,31 +271,29 @@ class DownstreamGDs(GlycanDataset):
 
     def to_statistical_learning(self):
         X, y, y_oh = [], [], []
-        for d in self:
+        for d in self.data:
             X.append(d["fp"])
             y.append(d["y"])
-            if "y_oh" in d:
+            if hasattr(d, "y_oh"):
                 y_oh.append(d["y_oh"])
         return np.vstack(X), np.concatenate(y), np.vstack(y_oh) if len(y_oh) != 0 else None
 
     def process(self):
         data = {k: [] for k in self.splits}
-        df = pd.read_csv(self.filename, sep="\t")
-        gs = GlycanStorage(self.root)
+        df = pd.read_csv(self.filename, sep="\t" if self.filename.suffix.lower().endswith(".tsv") else ",")
+        gs = GlycanStorage(Path(self.root).parent)
         for index, (_, row) in tqdm(enumerate(df.iterrows())):
-            try:
-                d = gs.query(row["glycan"])
-                if d is None:
-                    continue
-                if isinstance(row["label"], str) and "[" in row["label"] and "]" in row["label"]:
-                    d["y_oh"] = torch.tensor([int(x) for x in row["label"][1:-1].split(" ")])
+            d = gs.query(row["IUPAC"])
+            if d is None:
+                continue
+            if self.dataset_args["task"] == "regression" or len(self.dataset_args["label"]) == 1:
+                d["y"] = torch.tensor(list(row[self.dataset_args["label"]].values)).reshape(1, -1)
+            elif len(self.dataset_args["label"]) > 1:
+                d["y_oh"] = torch.tensor([int(x) for x in row[self.dataset_args["label"]]]).reshape(1, -1)
+                if self.dataset_args["task"] != "multilabel":
                     d["y"] = d["y_oh"].argmax().item()
-                else:
-                    d["y"] = row["label"]
-                d["ID"] = index
-                data[row["split"]].append(d)
-            except Exception as e:
-                print("Failed to process", row["glycan"], "\n\t", e)
+            d["ID"] = index
+            data[row["split"]].append(d)
         gs.close()
         print("Processed", sum(len(v) for v in data.values()), "entries")
         for split in self.splits:

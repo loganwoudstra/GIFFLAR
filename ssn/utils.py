@@ -14,6 +14,7 @@ from sklearn.svm import LinearSVC, LinearSVR
 from torchmetrics import MetricCollection, Accuracy, AUROC, MatthewsCorrCoef, MeanAbsoluteError, MeanSquaredError, \
     R2Score
 
+# MASK: +1 | Other: +2 => len(...) | len(...) + 1
 atom_map = {6: 0, 7: 1, 8: 2, 15: 3, 16: 4}
 bond_map = {Chem.BondType.SINGLE: 0, Chem.BondType.AROMATIC: 1, Chem.BondType.DOUBLE: 2, Chem.BondType.TRIPLE: 3}
 lib_map = {n: i for i, n in enumerate(lib)}
@@ -64,13 +65,15 @@ def get_metrics(task: Literal["regression", "classification", "multilabel"], n_o
         m = MetricCollection([
             MeanSquaredError(),
             MeanAbsoluteError(),
-            R2Score(),
+            # R2Score(),
         ])
     else:
         if n_outputs == 1:
             metric_args = {"task": "binary"}
-        else:
+        elif task != "multilabel":
             metric_args = {"task": "multiclass", "num_classes": n_outputs}
+        else:
+            metric_args = {"task": "multilabel", "num_labels": n_outputs}
         m = MetricCollection([
             Accuracy(**metric_args),
             AUROC(**metric_args),

@@ -15,10 +15,6 @@ class SweetNetLightning(DownstreamGGIN):
         x = batch.x_dict["atoms"]
         batch_ids = batch.batch_dict["atoms"]
         edge_index = batch.edge_index_dict["atoms", "coboundary", "atoms"]
-        # print(x.device)
-        # print(self.device)
-        # print(self.model.device)
-        # print(self.head.device)
 
         # Getting node features
         x = self.model.item_embedding(x)

@@ -21,6 +21,13 @@ class GNNGLY(DownstreamGGIN):
     def __init__(self, output_dim, task, **kwargs):
         super().__init__(14, output_dim, task)
 
+        self.atom_encoder = torch.eye(101)
+        self.chiral_encoder = torch.eye(4)
+        self.degree_encoder = torch.eye(13)
+        self.charge_encoder = torch.eye(5)
+        self.h_encoder = torch.eye(5)
+        self.hybrid_encoder = torch.eye(5)
+
         self.layers = [
             GCNConv(133, 14),
             GCNConv(14, 14),
@@ -40,21 +47,25 @@ class GNNGLY(DownstreamGGIN):
         )
 
     def forward(self, batch):
-        batch = batch.to(self.device)
-        x = batch.x_dict["atoms"]
-        batch_ids = batch.batch_dict["atoms"]
-        edge_index = batch.edge_index_dict["atoms", "coboundary", "atoms"]
+        x = batch["gnngly_x"]
+        batch_ids = batch["gnngly_batch"]
+        edge_index = batch["gnngly_edge_index"]
 
-        # print(x.device)
-        # print(self.device)
-        # print(self.head.device)
-        
+        x = torch.stack([torch.concat([
+            self.atom_encoder[a[0]],
+            self.chiral_encoder[a[1]],
+            self.degree_encoder[a[2]],
+            self.charge_encoder[a[3]],
+            self.h_encoder[a[4]],
+            self.hybrid_encoder[a[5]],
+        ]) for a in x])
+
         for layer in self.layers:
             x = layer(x, edge_index)
 
         graph_embed = self.pooling(x, batch_ids)
         pred = self.head(graph_embed)
-        if list(pred.shape) == [len(batch["y"]), 1]:
+        if self.task != "multilabel" and list(pred.shape) == [len(batch["y"]), 1]:
             pred = pred[:, 0]
         return {
             "node_embed": x,
