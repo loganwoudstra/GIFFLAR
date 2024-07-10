@@ -65,7 +65,7 @@ def get_metrics(task: Literal["regression", "classification", "multilabel"], n_o
         m = MetricCollection([
             MeanSquaredError(),
             MeanAbsoluteError(),
-            R2Score(),
+            R2Score(num_outputs=n_outputs),
         ])
     else:
         if n_outputs == 1:

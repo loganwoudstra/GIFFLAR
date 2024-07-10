@@ -4,3 +4,5 @@ data/*
 gifflar/.ipynb_checkpoints/*
 *.ipynb
 *.tsv
+tests/data/*
+tests/logs/*

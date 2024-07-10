@@ -33,6 +33,7 @@ def setup(**kwargs):
         transform=None, pre_transform=get_pretransforms(), **data_config
     )
     logger = CSVLogger("logs", name=kwargs["model"]["name"])
+    kwargs["dataset"]["filepath"] = str(data_config["filepath"])
     logger.log_hyperparams(kwargs)
     metrics = get_metrics(data_config["task"], data_config["num_classes"])
     return data_config, datamodule, logger, metrics
@@ -136,10 +137,13 @@ def unfold_config(config):
 def main(config):
     custom_args = read_yaml_config(config)
     for args in unfold_config(custom_args):
+        # if args["dataset"]["name"] in {"class-1"}:
+        #     continue
         if args["model"]["name"] in ["rf", "svm", "xgb"]:
             fit(**args)
         else:
             train(**args)
+        print("Finished", args["model"]["name"], "on", args["dataset"]["name"])
 
 
 if __name__ == '__main__':

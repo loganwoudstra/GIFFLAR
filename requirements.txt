@@ -9,3 +9,4 @@ git+https://github.com/BojarLab/glycowork.git@ab73b62d7d500d321592cca20cdf3b8507
 jsonargparse
 rich
 pytorch-lightning
+pytest
