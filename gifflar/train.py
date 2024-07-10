@@ -50,28 +50,31 @@ def fit(**kwargs):
         (*datamodule.val.to_statistical_learning(), "val"),
         (*datamodule.test.to_statistical_learning(), "test"),
     ]:
-        labels = torch.tensor(yoh if data_config["task"] == "multilabel" else y, dtype=torch.long if data_config["task"] != "regression" else torch.float)
+        labels = torch.tensor(
+            yoh if data_config["task"] == "multilabel" else y,
+            dtype=torch.long if data_config["task"] != "regression" else torch.float
+        )
 
-        if data_config["task"] in {"classification", "multilabel"}:
-            preds = torch.tensor(model.predict_proba(X), dtype=torch.float)
-        else:
-            preds = torch.tensor(model.predict(X), dtype=torch.float)
+        preds = torch.tensor(model.predict_proba(X) if data_config["task"] in {"classification", "multilabel"} else
+                             model.predict(X), dtype=torch.float)
 
-        if data_config["task"] == "classification" and data_config["num_classes"] > 1 and kwargs["model"]["name"] =="xgb":
-            preds = preds[0]
-        if data_config["task"] == "classification" and data_config["num_classes"] == 1 and len(preds.shape) == 2:
-            preds = preds[:, 1]
-        if data_config["task"] == "regression" or data_config["num_classes"] == 1:
-            preds = preds.reshape(labels.shape)
-        if data_config["task"] == "classification" and data_config["num_classes"] > 1:
-            labels = labels[:, 0]
-        if data_config["task"] == "multilabel" and len(preds.shape) == 3:
+        if data_config["task"] == "classification":
+            if data_config["num_classes"] > 1:
+                labels = labels[:, 0]
+                if kwargs["model"]["name"] == "xgb":
+                    preds = preds[0]
+            else:
+                preds = preds[:, 1]
+                labels = labels.reshape(-1)
+        elif data_config["task"] == "multilabel" and len(preds.shape) == 3:
             preds = preds[:, :, 1].T
-
-        if data_config["task"] == "regression" and data_config["num_classes"] > 1:
-            metrics[name].update(preds.reshape(-1), labels.reshape(-1))
+        elif data_config["num_classes"] == 1:  # data_config["task"] == "regression"
+            preds = preds.reshape(labels.shape)
         else:
-            metrics[name].update(preds, labels)
+            preds = preds.reshape(-1)
+            labels = labels.reshape(-1)
+
+        metrics[name].update(preds, labels)
         logger.log_metrics(metrics[name].compute())
     print("Fitted", kwargs["model"]["name"])
     logger.save()

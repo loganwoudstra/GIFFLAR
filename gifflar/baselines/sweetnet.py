@@ -31,7 +31,7 @@ class SweetNetLightning(DownstreamGGIN):
         x_out = self.model.bn2(self.model.lin2(x))
         x = F.dropout(self.model.act2(x_out), p=0.5, training=self.model.training)
 
-        x = self.model.lin3(x).squeeze(1)
+        x = self.model.lin3(x)
 
         return {
             "node_embed": node_embeds,

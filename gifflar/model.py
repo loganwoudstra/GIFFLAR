@@ -92,8 +92,6 @@ class DownstreamGGIN(GlycanGIN):
     def forward(self, batch):
         node_embed, graph_embed = super().forward(batch)
         pred = self.head(graph_embed)
-        if self.task != "multilabel" and list(pred.shape) == [len(batch["y"]), 1]:
-            pred = pred[:, 0]
         return {
             "node_embed": node_embed,
             "graph_embed": graph_embed,
@@ -103,7 +101,11 @@ class DownstreamGGIN(GlycanGIN):
     def shared_step(self, batch, stage: str):
         fwd_dict = self.forward(batch)
         fwd_dict["labels"] = batch["y_oh"] if self.task == "multilabel" else batch["y"]
-        if self.task == "multilabel":
+
+        if self.task != "multilabel":
+            if list(fwd_dict["preds"].shape) == [len(batch["y"]), 1]:
+                fwd_dict["preds"] = fwd_dict["preds"][:, 0]
+        else:
             fwd_dict["preds"] = self.sigmoid(fwd_dict["preds"])
 
         if self.output_dim == 1 or self.task == "multilabel":
@@ -113,13 +115,10 @@ class DownstreamGGIN(GlycanGIN):
         else:
             fwd_dict["loss"] = self.loss(fwd_dict["preds"], fwd_dict["labels"])
 
-        if self.task == "regression":
-            self.metrics[stage].update(fwd_dict["preds"], fwd_dict["labels"].reshape(fwd_dict["preds"].shape))
+        if self.task == "classification" and self.output_dim > 1:
+            self.metrics[stage].update(fwd_dict["preds"], fwd_dict["labels"].reshape(fwd_dict["preds"].shape[:-1]))
         else:
-            if self.output_dim == 1 or self.task == "multilabel":
-                self.metrics[stage].update(fwd_dict["preds"], fwd_dict["labels"].reshape(fwd_dict["preds"].shape))
-            else:
-                self.metrics[stage].update(fwd_dict["preds"], fwd_dict["labels"].reshape(fwd_dict["preds"].shape[:-1]))
+            self.metrics[stage].update(fwd_dict["preds"], fwd_dict["labels"].reshape(fwd_dict["preds"].shape))
 
         self.log(f"{stage}/loss", fwd_dict["loss"], batch_size=self.batch_size)
         return fwd_dict

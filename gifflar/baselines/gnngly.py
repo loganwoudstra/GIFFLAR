@@ -65,8 +65,6 @@ class GNNGLY(DownstreamGGIN):
 
         graph_embed = self.pooling(x, batch_ids)
         pred = self.head(graph_embed)
-        if self.task != "multilabel" and list(pred.shape) == [len(batch["y"]), 1]:
-            pred = pred[:, 0]
         return {
             "node_embed": x,
             "graph_embed": graph_embed,
