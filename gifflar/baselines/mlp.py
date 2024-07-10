@@ -1,4 +1,4 @@
-from ssn.model import DownstreamGGIN
+from gifflar.model import DownstreamGGIN
 
 
 class MLP(DownstreamGGIN):

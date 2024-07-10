@@ -10,7 +10,7 @@ from torch_geometric.transforms import Compose
 from torch_geometric.transforms.base_transform import BaseTransform
 from torch_geometric.utils import from_networkx
 
-from ssn.utils import bond_map, lib_map, atom_map
+from gifflar.utils import bond_map, lib_map, atom_map
 
 
 class RootTransform(BaseTransform):

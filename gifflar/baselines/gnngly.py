@@ -3,7 +3,7 @@ from torch import nn
 from torch_geometric.nn import GCNConv, global_mean_pool
 from torch_geometric.transforms import BaseTransform
 
-from ssn.model import DownstreamGGIN
+from gifflar.model import DownstreamGGIN
 
 """
 Learning Rate:    0

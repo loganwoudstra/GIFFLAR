@@ -10,7 +10,7 @@ from rdkit.Chem import BondType
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, GradientBoostingRegressor, \
     GradientBoostingClassifier
 from sklearn.multioutput import MultiOutputRegressor, MultiOutputClassifier
-from sklearn.svm import LinearSVC, LinearSVR
+from sklearn.svm import LinearSVR, SVC, SVR
 from torchmetrics import MetricCollection, Accuracy, AUROC, MatthewsCorrCoef, MeanAbsoluteError, MeanSquaredError, \
     R2Score
 
@@ -38,13 +38,13 @@ def get_sl_model(
         case "svm", "regression", 1:
             return LinearSVR(**model_args)
         case "svm", "regression", _:
-            return MultiOutputRegressor(LinearSVR(**model_args))
-        case "svm", "classification", 1:
-            return LinearSVC(**model_args)
+            if "random_state" in model_args:
+                del model_args["random_state"]
+            return MultiOutputRegressor(SVR(kernel="linear", **model_args))
         case "svm", "classification", _:
-            return MultiOutputClassifier(LinearSVC(**model_args))
+            return SVC(kernel="linear", probability=True, **model_args)
         case "svm", "multilabel", _:
-            raise NotImplementedError("SVCs for Multi-label classification are not included yet.")
+            return MultiOutputClassifier(SVC(kernel="linear", probability=True, **model_args))
         case "xgb", "regression", 1:
             return GradientBoostingRegressor(**model_args)
         case "xgb", "regression", _:
@@ -54,7 +54,7 @@ def get_sl_model(
         case "xgb", "classification", _:
             return MultiOutputClassifier(GradientBoostingClassifier(**model_args))
         case "xgb", "multilabel", _:
-            raise NotImplementedError("SVCs for Multi-label classification are not included yet.")
+            return MultiOutputClassifier(GradientBoostingClassifier(**model_args))
         case _:
             raise NotImplementedError(f"The combination of (name, task, n_outputs) as ({name} {task}, {n_outputs}) has "
                                       f"not been considered.")
@@ -65,7 +65,7 @@ def get_metrics(task: Literal["regression", "classification", "multilabel"], n_o
         m = MetricCollection([
             MeanSquaredError(),
             MeanAbsoluteError(),
-            # R2Score(),
+            R2Score(),
         ])
     else:
         if n_outputs == 1:

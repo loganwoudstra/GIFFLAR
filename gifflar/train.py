@@ -8,14 +8,14 @@ from pytorch_lightning.callbacks import RichProgressBar, RichModelSummary
 from pytorch_lightning.loggers import CSVLogger
 from torch_geometric import seed_everything
 
-from ssn.baselines.gnngly import GNNGLY
-from ssn.baselines.mlp import MLP
-from ssn.baselines.sweetnet import SweetNetLightning
-from ssn.data import DownsteamGDM
-from ssn.benchmarks import get_dataset
-from ssn.model import DownstreamGGIN
-from ssn.pretransforms import get_pretransforms
-from ssn.utils import get_sl_model, get_metrics
+from gifflar.baselines.gnngly import GNNGLY
+from gifflar.baselines.mlp import MLP
+from gifflar.baselines.sweetnet import SweetNetLightning
+from gifflar.data import DownsteamGDM
+from gifflar.benchmarks import get_dataset
+from gifflar.model import DownstreamGGIN
+from gifflar.pretransforms import get_pretransforms
+from gifflar.utils import get_sl_model, get_metrics
 
 MODELS = {
     "ssn": DownstreamGGIN,
@@ -39,47 +39,44 @@ def setup(**kwargs):
 
 
 def fit(**kwargs):
-    return
     data_config, datamodule, logger, metrics = setup(**kwargs)
     model = get_sl_model(kwargs["model"]["name"], data_config["task"], data_config["num_classes"], **kwargs)
     train_X, train_y, train_yoh = datamodule.train.to_statistical_learning()
-    if data_config["task"] == "classification" and data_config["num_classes"] > 2:
-        model.fit(train_X, train_yoh)
-    else:
-        model.fit(train_X, train_y)
-
-    print("Fitted", kwargs["model"]["name"])
+    model.fit(train_X, train_yoh if data_config["task"] == "multilabel" else train_y)
 
     for X, y, yoh, name in [
         (train_X, train_y, train_yoh, "train"),
         (*datamodule.val.to_statistical_learning(), "val"),
         (*datamodule.test.to_statistical_learning(), "test"),
     ]:
-        if kwargs["model"]["name"] == "svm":
-            preds = model.predict(X)
+        labels = torch.tensor(yoh if data_config["task"] == "multilabel" else y, dtype=torch.long if data_config["task"] != "regression" else torch.float)
+
+        if data_config["task"] in {"classification", "multilabel"}:
+            preds = torch.tensor(model.predict_proba(X), dtype=torch.float)
         else:
-            preds = model.predict_proba(X)
+            preds = torch.tensor(model.predict(X), dtype=torch.float)
 
-        if data_config["task"] == "classification" and data_config["num_classes"] == 1 and len(preds.shape) >= 2:
+        if data_config["task"] == "classification" and data_config["num_classes"] > 1 and kwargs["model"]["name"] =="xgb":
+            preds = preds[0]
+        if data_config["task"] == "classification" and data_config["num_classes"] == 1 and len(preds.shape) == 2:
             preds = preds[:, 1]
-        if list(torch.tensor(preds).shape) == [data_config["num_classes"], len(X), 2]:
-            preds = torch.tensor(preds)[:, :, 1].T
+        if data_config["task"] == "regression" or data_config["num_classes"] == 1:
+            preds = preds.reshape(labels.shape)
+        if data_config["task"] == "classification" and data_config["num_classes"] > 1:
+            labels = labels[:, 0]
+        if data_config["task"] == "multilabel" and len(preds.shape) == 3:
+            preds = preds[:, :, 1].T
 
-        t_preds = torch.tensor(preds, dtype=torch.float)
-        t_labels = torch.tensor(y, dtype=torch.long)
-        metrics[name].update(t_preds, t_labels)
+        if data_config["task"] == "regression" and data_config["num_classes"] > 1:
+            metrics[name].update(preds.reshape(-1), labels.reshape(-1))
+        else:
+            metrics[name].update(preds, labels)
         logger.log_metrics(metrics[name].compute())
+    print("Fitted", kwargs["model"]["name"])
     logger.save()
 
 
 def train(**kwargs):
-    # seed_everything(kwargs["seed"])
-    # data_config = kwargs["dataset"]
-    # data_config["filepath"] = get_dataset(data_config["name"])
-    # datamodule = DownsteamGDM(root=kwargs["root_dir"], filename=data_config["filepath"],
-    #                           batch_size=kwargs["model"]["batch_size"], **data_config)
-    # logger = CSVLogger("logs", name=kwargs["model"]["name"])
-    # logger.log_hyperparams(kwargs)
     data_config, datamodule, logger, _ = setup(**kwargs)
     model = MODELS[kwargs["model"]["name"]](output_dim=data_config["num_classes"], task=data_config["task"],
                                             **kwargs["model"])
@@ -136,12 +133,16 @@ def unfold_config(config):
             yield tmp_config
 
 
-if __name__ == '__main__':
-    parser = ArgumentParser()
-    parser.add_argument("config", type=str, help="Path to YAML config file")
-    custom_args = read_yaml_config(parser.parse_args().config)
+def main(config):
+    custom_args = read_yaml_config(config)
     for args in unfold_config(custom_args):
         if args["model"]["name"] in ["rf", "svm", "xgb"]:
             fit(**args)
         else:
             train(**args)
+
+
+if __name__ == '__main__':
+    parser = ArgumentParser()
+    parser.add_argument("config", type=str, help="Path to YAML config file")
+    main(parser.parse_args().config)

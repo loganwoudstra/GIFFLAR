@@ -2,7 +2,7 @@ from glycowork.ml.models import prep_model
 from torch_geometric.nn import global_mean_pool
 import torch.nn.functional as F
 
-from ssn.model import DownstreamGGIN
+from gifflar.model import DownstreamGGIN
 
 
 class SweetNetLightning(DownstreamGGIN):

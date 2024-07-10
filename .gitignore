@@ -1,6 +1,6 @@
 .idea/*
 logs/*
 data/*
-ssn/.ipynb_checkpoints/*
+gifflar/.ipynb_checkpoints/*
 *.ipynb
 *.tsv

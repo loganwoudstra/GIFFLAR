@@ -15,7 +15,7 @@ import glyles
 from glyles.glycans.factory.factory import MonomerFactory
 from tqdm import tqdm
 
-from ssn.utils import S3NMerger, nx2mol
+from gifflar.utils import S3NMerger, nx2mol
 
 Chem.SetDefaultPickleProperties(Chem.PropertyPickleOptions.AllProps)
 

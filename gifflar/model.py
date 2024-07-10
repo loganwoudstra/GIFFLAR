@@ -6,7 +6,7 @@ import torch
 from torch import nn
 from torch_geometric.nn import GINConv, HeteroConv, global_mean_pool
 
-from ssn.utils import atom_map, bond_map, get_metrics
+from gifflar.utils import atom_map, bond_map, get_metrics
 
 
 def dict_embeddings(dim: int, keys: List[object]):

@@ -8,7 +8,7 @@ from glycowork.glycan_data.loader import df_species as taxonomy
 from glyles import convert
 from tqdm import tqdm
 
-from ssn.utils import DatasetInfo, RawDataInfo
+from gifflar.utils import DatasetInfo, RawDataInfo
 
 
 def iupac2smiles(iupac):
@@ -24,28 +24,51 @@ def iupac2smiles(iupac):
 
 
 def get_taxonomy():
+    """
+    Download full taxonomy data, process it, and save it as a tsv file.
+    """
     if not (p := Path("taxonomy.tsv")).exists():
         mask = []
         for i in tqdm(taxonomy["glycan"]):
-            mask.append(iupac2smiles(i) is not None)
+            smiles = iupac2smiles(i)
+            mask.append(smiles is not None and len(smiles) > 10)
         tax = taxonomy[mask]
         tax.to_csv(p, sep="\t", index=False)
     return pd.read_csv(p, sep="\t")
 
 
 def get_taxonomic_level(level):
+    """
+    Extract taxonomy data at a specific level, process it, and save it as a tsv file.
+    """
     if not (p := Path(f"taxonomy_{level}.tsv")).exists():
         tax = get_taxonomy()[["glycan", level]]
-        tax = tax[~tax[level].isna()]
         tax.rename(columns={"glycan": "IUPAC"}, inplace=True)
-        tax["label"] = list(np.array(pd.get_dummies(tax[level]), dtype=int))
-        tax = tax.sample(frac=1)
+        tax.dropna(inplace=True)
+
+        classes = set()
+        for v in tax[level].unique():
+            if isinstance(v, str):
+                classes.update(v.split(";"))
+        for c in classes:
+            tax[c] = tax[level].apply(lambda x: c in x.split(";"))
         tax["split"] = np.random.choice(["train", "val", "test"], tax.shape[0], p=[0.7, 0.2, 0.1])
         tax.to_csv(p, sep="\t", index=False)
     return p
 
 
 def get_immunogenicity():
+    """
+    Download immunogenicity data, process it, and save it as a tsv file.
+
+    Config:
+        - name: Immunogenicity
+          task: class-1
+          label: label
+
+    Returns:
+        The filepath of the processed immunogenicity data.
+    """
     if not (p := Path("immunogenicity.tsv")).exists():
         urllib.request.urlretrieve(
             "https://torchglycan.s3.us-east-2.amazonaws.com/downstream/glycan_immunogenicity.csv",
@@ -53,12 +76,31 @@ def get_immunogenicity():
         )
         df = pd.read_csv("immunogenicity.csv")[["glycan", "immunogenicity"]]
         df.rename(columns={"glycan": "IUPAC"}, inplace=True)
+        df.dropna(inplace=True)
+
+        classes = {n: i for i, n in enumerate(df["immunogenicity"].unique())}
+        df["label"] = df["immunogenicity"].map(classes)
         df["split"] = np.random.choice(["train", "val", "test"], df.shape[0], p=[0.7, 0.2, 0.1])
+
         df.to_csv(p, sep="\t", index=False)
+        with open("immunogenicity_classes.tsv", "w") as f:
+            for n, i in classes.items():
+                print(n, i, sep="\t", file=f)
     return p
 
 
 def get_glycosylation():
+    """
+    Download glycosylation data, process it, and save it as a tsv file.
+
+    Config:
+        - name: Glycosylation
+          task: class-1
+          label: label
+
+    Returns:
+        The filepath of the processed glycosylation data.
+    """
     if not (p := Path("glycosylation.tsv")).exists():
         urllib.request.urlretrieve(
             "https://torchglycan.s3.us-east-2.amazonaws.com/downstream/glycan_properties.csv",
@@ -67,25 +109,16 @@ def get_glycosylation():
         df = pd.read_csv("glycosylation.csv")[["glycan", "link"]]
         df.rename(columns={"glycan": "IUPAC"}, inplace=True)
         df.dropna(inplace=True)
-        df["label"] = list(np.array(pd.get_dummies(df["link"]), dtype=int))
+
+        classes = {n: i for i, n in enumerate(df["link"].unique())}
+        df["label"] = df["ling"].map(classes)
         df["split"] = np.random.choice(["train", "val", "test"], df.shape[0], p=[0.7, 0.2, 0.1])
+
         df.to_csv(p, sep="\t", index=False)
+        with open("glycosylation_classes.tsv", "w") as f:
+            for n, i in classes.items():
+                print(n, i, sep="\t", file=f)
     return p
-
-
-taxonomy_classes: Dict[str, RawDataInfo] = {
-    "Domain": (5, "classification"),
-    "Subdomain": (5, "classification"),
-    "Kingdom": (1, "classification"),
-    "Phylum": (1, "classification"),
-    "Class": (1, "multilabel"),
-    "Order": (1, "multilabel"),
-    "Family": (1, "multilabel"),
-    "Genus": (1, "multilabel"),
-    "Species": (1, "multilabel"),
-    "Immunogenicity": (1, "classification"),
-    "Glycosylation": (3, "classification"),
-}
 
 
 def get_dataset(data_config) -> Dict:
