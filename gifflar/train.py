@@ -1,4 +1,6 @@
 import copy
+import hashlib
+import json
 
 import torch
 import yaml
@@ -18,7 +20,7 @@ from gifflar.pretransforms import get_pretransforms
 from gifflar.utils import get_sl_model, get_metrics
 
 MODELS = {
-    "ssn": DownstreamGGIN,
+    "gifflar": DownstreamGGIN,
     "gnngly": GNNGLY,
     "mlp": MLP,
     "sweetnet": SweetNetLightning,
@@ -29,8 +31,9 @@ def setup(**kwargs):
     seed_everything(kwargs["seed"])
     data_config = get_dataset(kwargs["dataset"])
     datamodule = DownsteamGDM(
-        root=kwargs["root_dir"], filename=data_config["filepath"], batch_size=kwargs["model"].get("batch_size", 1),
-        transform=None, pre_transform=get_pretransforms(), **data_config
+        root=kwargs["root_dir"], filename=data_config["filepath"], hash_code=kwargs["hash"],
+        batch_size=kwargs["model"].get("batch_size", 1), transform=None,
+        pre_transform=get_pretransforms(**(kwargs["pre-transforms"] or {})), **data_config,
     )
     logger = CSVLogger("logs", name=kwargs["model"]["name"])
     kwargs["dataset"]["filepath"] = str(data_config["filepath"])
@@ -76,14 +79,13 @@ def fit(**kwargs):
 
         metrics[name].update(preds, labels)
         logger.log_metrics(metrics[name].compute())
-    print("Fitted", kwargs["model"]["name"])
     logger.save()
 
 
 def train(**kwargs):
     data_config, datamodule, logger, _ = setup(**kwargs)
     model = MODELS[kwargs["model"]["name"]](output_dim=data_config["num_classes"], task=data_config["task"],
-                                            **kwargs["model"])
+                                            pre_transform_args=kwargs["pre-transforms"], **kwargs["model"])
     trainer = Trainer(
         callbacks=[
             # ModelCheckpoint(save_last=True, mode="min", monitor="val/reg/loss", save_top_k=1),
@@ -137,11 +139,23 @@ def unfold_config(config):
             yield tmp_config
 
 
+def hash_dict(input_dict, n_chars: int = 8):
+    # Convert the dictionary to a JSON string
+    dict_str = json.dumps(input_dict, sort_keys=True)
+
+    # Generate a SHA-256 hash of the string
+    hash_obj = hashlib.sha256(dict_str.encode())
+
+    # Get the first 8 characters of the hexadecimal digest
+    hash_str = hash_obj.hexdigest()[:n_chars]
+
+    return hash_str
+
+
 def main(config):
     custom_args = read_yaml_config(config)
     for args in unfold_config(custom_args):
-        # if args["dataset"]["name"] in {"class-1"}:
-        #     continue
+        args["hash"] = hash_dict(args["pre-transforms"])
         if args["model"]["name"] in ["rf", "svm", "xgb"]:
             fit(**args)
         else:

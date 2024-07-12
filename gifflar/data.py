@@ -82,9 +82,7 @@ def hetero_collate(data):
     node_counts = {node_type: [0] for node_type in node_types}
     for d in data:
         for key in kwargs:
-            # The following does not work, because NodeStorage reports to not have len, but one can run len(NodeStorage)
             if not hasattr(d[key], "__len__") or len(d[key]) != 0:
-                # if getattr(d[key], "len", 0) != 0:
                 kwargs[key].append(d[key])
         for node_type in node_types:
             node_counts[node_type].append(node_counts[node_type][-1] + d[node_type].num_nodes)
@@ -171,23 +169,27 @@ class GlycanDataModule(LightningDataModule):
 
 
 class PretrainGDM(GlycanDataModule):
-    def __init__(self, root: str | Path, filename: str | Path, batch_size: int = 64, train_frac: float = 0.8, **kwargs):
+    def __init__(self, root: str | Path, filename: str | Path, hash_code: str, batch_size: int = 64,
+                 train_frac: float = 0.8, **kwargs):
         super().__init__(batch_size)
-        ds = PretrainGDs(root=root, filename=filename, **kwargs)
+        ds = PretrainGDs(root=root, filename=filename, hash_code=hash_code, **kwargs)
         self.train, self.val = torch.utils.data.dataset.random_split(ds, [train_frac, 1 - train_frac])
 
 
 class DownsteamGDM(GlycanDataModule):
-    def __init__(self, root, filename, batch_size, transform, pre_transform, **dataset_args):
+    def __init__(self, root, filename, hash_code, batch_size, transform, pre_transform, **dataset_args):
         super().__init__(batch_size)
         self.train = DownstreamGDs(
-            root=root, filename=filename, split="train", transform=transform, pre_transform=pre_transform, **dataset_args
+            root=root, filename=filename, split="train", hash_code=hash_code, transform=transform,
+            pre_transform=pre_transform, **dataset_args,
         )
         self.val = DownstreamGDs(
-            root=root, filename=filename, split="val", transform=transform, pre_transform=pre_transform, **dataset_args
+            root=root, filename=filename, split="val", hash_code=hash_code, transform=transform,
+            pre_transform=pre_transform, **dataset_args,
         )
         self.test = DownstreamGDs(
-            root=root, filename=filename, split="test", transform=transform, pre_transform=pre_transform, **dataset_args
+            root=root, filename=filename, split="test", hash_code=hash_code, transform=transform,
+            pre_transform=pre_transform, **dataset_args,
         )
 
 
@@ -196,15 +198,16 @@ class GlycanDataset(InMemoryDataset):
             self,
             root: str | Path,
             filename: str | Path,
+            hash_code: str,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
             path_idx: int = 0,
             **dataset_args,
     ):
-        # Removed slices from collate, saving and loading. Might be unnecessary?
         self.filename = Path(filename)
         self.dataset_args = dataset_args
-        super().__init__(root=str(Path(root) / filename.stem), transform=transform, pre_transform=pre_transform)
+        super().__init__(root=str(Path(root) / f"{filename.stem}_{hash_code}"), transform=transform,
+                         pre_transform=pre_transform)
         self.data = torch.load(self.processed_paths[path_idx])
 
     def __len__(self):
@@ -234,11 +237,13 @@ class PretrainGDs(GlycanDataset):
             self,
             root: str | Path,
             filename: str | Path,
+            hash_code: str,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
             **dataset_args
     ):
-        super().__init__(root=root, filename=filename, transform=transform, pre_transform=pre_transform, **dataset_args)
+        super().__init__(root=root, filename=filename, hash_code=hash_code, transform=transform,
+                         pre_transform=pre_transform, **dataset_args)
 
     @property
     def processed_file_names(self) -> Union[str, List[str], Tuple[str, ...]]:
@@ -258,12 +263,13 @@ class DownstreamGDs(GlycanDataset):
             root: str | Path,
             filename: str | Path,
             split: str,
+            hash_code: str,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
             **dataset_args
     ):
-        super().__init__(root=root, filename=filename, transform=transform, pre_transform=pre_transform,
-                         path_idx=self.splits[split], **dataset_args)
+        super().__init__(root=root, filename=filename, hash_code=hash_code, transform=transform,
+                         pre_transform=pre_transform, path_idx=self.splits[split], **dataset_args)
 
     @property
     def processed_file_names(self) -> Union[str, List[str], Tuple[str, ...]]:
@@ -281,6 +287,8 @@ class DownstreamGDs(GlycanDataset):
     def process(self):
         data = {k: [] for k in self.splits}
         df = pd.read_csv(self.filename, sep="\t" if self.filename.suffix.lower().endswith(".tsv") else ",")
+        if "label" not in self.dataset_args:
+            self.dataset_args["label"] = [x for x in df.columns if x not in {"IUPAC", "split"}]
         gs = GlycanStorage(Path(self.root).parent)
         for index, (_, row) in tqdm(enumerate(df.iterrows())):
             d = gs.query(row["IUPAC"])

@@ -1,4 +1,4 @@
-from typing import List, Literal
+from typing import List, Literal, Dict, Optional
 
 from glycowork.glycan_data.loader import lib
 from pytorch_lightning import LightningModule
@@ -6,6 +6,7 @@ import torch
 from torch import nn
 from torch_geometric.nn import GINConv, HeteroConv, global_mean_pool
 
+from gifflar.pretransforms import RandomWalkPE, LaplacianPE
 from gifflar.utils import atom_map, bond_map, get_metrics
 
 
@@ -26,13 +27,27 @@ def get_gin_layer(hidden_dim: int):
     )
 
 
+pre_transforms = {
+    "LaplacianPE": LaplacianPE,
+    "RandomWalkPE": RandomWalkPE,
+}
+
+
 class GlycanGIN(LightningModule):
-    def __init__(self, hidden_dim: int, num_layers: int, task: Literal["regression", "classification", "multilabel"]):
+    def __init__(self, hidden_dim: int, num_layers: int, task: Literal["regression", "classification", "multilabel"],
+                 pre_transform_args: Optional[Dict] = None):
         super().__init__()
+        rand_dim = hidden_dim
+        self.addendum = []
+        if pre_transform_args is not None:
+            for name, args in pre_transform_args.items():
+                self.addendum.append(pre_transforms[name].attr_name)
+                rand_dim -= args["dim"]
+
         self.embedding = {
-            "atoms": nn.Embedding(len(atom_map) + 2, hidden_dim),
-            "bonds": nn.Embedding(len(bond_map) + 2, hidden_dim),
-            "monosacchs": nn.Embedding(len(lib) + 2, hidden_dim),
+            "atoms": nn.Embedding(len(atom_map) + 2, rand_dim),
+            "bonds": nn.Embedding(len(bond_map) + 2, rand_dim),
+            "monosacchs": nn.Embedding(len(lib) + 2, rand_dim),
         }
 
         self.convs = torch.nn.ModuleList()
@@ -53,7 +68,13 @@ class GlycanGIN(LightningModule):
 
     def forward(self, batch):
         for key in batch.x_dict.keys():
-            batch.x_dict[key] = self.embedding[key](batch.x_dict[key])
+            # Compute random encodings for the atom type and include positional encodings
+            pes = [self.embedding[key](batch.x_dict[key])]
+            for pe in self.addendum:
+                pes.append(batch[f"{key}_{pe}"])
+
+            batch.x_dict[key] = torch.concat(pes, dim=1)
+
         for conv in self.convs:
             batch.x_dict = conv(batch.x_dict, batch.edge_index_dict)
 
@@ -63,9 +84,14 @@ class GlycanGIN(LightningModule):
         )
 
 
+class PretrainGGIN(GlycanGIN):
+    pass
+
+
 class DownstreamGGIN(GlycanGIN):
-    def __init__(self, hidden_dim: int, output_dim: int, task: Literal["regression", "classification", "multilabel"], num_layers: int = 3, batch_size: int = 32, **kwargs):
-        super().__init__(hidden_dim, num_layers, task)
+    def __init__(self, hidden_dim: int, output_dim: int, task: Literal["regression", "classification", "multilabel"],
+                 num_layers: int = 3, batch_size: int = 32, pre_transform_args: Optional[Dict] = None, **kwargs):
+        super().__init__(hidden_dim, num_layers, task, pre_transform_args)
         self.output_dim = output_dim
 
         self.head = nn.Sequential(

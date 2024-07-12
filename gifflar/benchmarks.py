@@ -1,14 +1,12 @@
 import urllib.request
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
 import numpy as np
 import pandas as pd
 from glycowork.glycan_data.loader import df_species as taxonomy
 from glyles import convert
 from tqdm import tqdm
-
-from gifflar.utils import DatasetInfo, RawDataInfo
 
 
 def iupac2smiles(iupac):
@@ -37,6 +35,10 @@ def get_taxonomy():
     return pd.read_csv(p, sep="\t")
 
 
+def bitwise_or_agg(arrays):
+    return np.bitwise_or.reduce(arrays)
+
+
 def get_taxonomic_level(level):
     """
     Extract taxonomy data at a specific level, process it, and save it as a tsv file.
@@ -44,14 +46,15 @@ def get_taxonomic_level(level):
     if not (p := Path(f"taxonomy_{level}.tsv")).exists():
         tax = get_taxonomy()[["glycan", level]]
         tax.rename(columns={"glycan": "IUPAC"}, inplace=True)
+        tax[tax[level] == "undetermined"] = np.nan
         tax.dropna(inplace=True)
 
-        classes = set()
-        for v in tax[level].unique():
-            if isinstance(v, str):
-                classes.update(v.split(";"))
-        for c in classes:
-            tax[c] = tax[level].apply(lambda x: c in x.split(";"))
+        tax = pd.concat([tax["IUPAC"], pd.get_dummies(tax[level])], axis=1)
+        tax = tax.groupby('IUPAC').agg("sum").reset_index()
+
+        classes = [x for x in tax.columns if x != "IUPAC"]
+        tax[classes] = tax[classes].applymap(lambda x: min(1, x))
+
         tax["split"] = np.random.choice(["train", "val", "test"], tax.shape[0], p=[0.7, 0.2, 0.1])
         tax.to_csv(p, sep="\t", index=False)
     return p
@@ -130,8 +133,11 @@ def get_dataset(data_config) -> Dict:
             path = get_immunogenicity()
         case "Glycosylation":
             path = get_glycosylation()
-        case "class-1" | "class-n" | "multilabel" | "reg-1" | "reg-n":
-            path = Path("dummy_data") / f"{name_fracs[0].replace('-', '_')}.csv"
+        case "class-1" | "class-n" | "multilabel" | "reg-1" | "reg-n":  # Used for testing
+            root = Path("dummy_data")
+            if not root.is_dir():
+                root = "tests" / root
+            path = root / f"{name_fracs[0].replace('-', '_')}.csv"
         case _:  # Unknown dataset
             raise ValueError(f"Unknown dataset {data_config['name']}.")
     if data_config["task"] in {"regression", "multilabel"}:

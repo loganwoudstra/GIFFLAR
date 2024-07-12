@@ -10,3 +10,6 @@ jsonargparse
 rich
 pytorch-lightning
 pytest
+pyyaml
+networkx
+torchmetrics

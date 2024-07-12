@@ -26,35 +26,11 @@ datasets:
       - reg3
     task: regression
 pre-transforms:
+  LaplacianPE:
+    dim: 20
+  RandomWalkPE:
+    dim: 20
 model:
-  - name: rf
-    n_estimators: 500
-    n_jobs: -1
-    random_state: 42
-  - name: svm
-    random_state: 42
-  - name: xgb
-    random_state: 42
-  - name: mlp
-    hidden_dim: 1024
-    batch_size: 256
-    num_layers: 3
-    epochs: 5
-    learning_rate: 0
-    optimizer: Adam
-  - name: sweetnet
-    hidden_dim: 128
-    batch_size: 256
-    epochs: 5
-    learning_rate: 0.001
-    optimizer: Adam
-  - name: gnngly
-    hidden_dim: 14
-    batch_size: 256
-    num_layers: 5
-    epochs: 5
-    learning_rate: 0
-    optimizer: Adam
   - name: gifflar
     hidden_dim: 128
     batch_size: 32
