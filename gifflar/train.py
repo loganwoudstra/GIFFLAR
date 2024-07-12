@@ -92,9 +92,9 @@ def train(**kwargs):
             RichModelSummary(),
             RichProgressBar(),
         ],
-        accelerator="cpu",
+        # accelerator="cpu",
         max_epochs=kwargs["model"]["epochs"],
-        logger=logger
+        logger=logger,
     )
     trainer.fit(model, datamodule)
 
