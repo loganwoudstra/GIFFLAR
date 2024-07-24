@@ -2,7 +2,9 @@ seed: 42
 data_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/
 root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data
 datasets:
-  - Immunogenicity
+  - name: class-1
+    label: class
+    task: classification
 pre-transforms:
 model:
   - name: rf

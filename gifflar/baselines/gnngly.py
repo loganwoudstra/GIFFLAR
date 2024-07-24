@@ -60,7 +60,18 @@ class GNNGLY(DownstreamGGIN):
             nn.Linear(64, output_dim),
         )
 
-    def forward(self, batch) -> Dict[str, torch.Tensor]:
+    def to(self, device):
+        super(GNNGLY, self).to(device)
+        self.layers = [l.to(device) for l in self.layers]
+        self.atom_encoder.to(device)
+        self.chiral_encoder.to(device)
+        self.degree_encoder.to(device)
+        self.charge_encoder.to(device)
+        self.h_encoder.to(device)
+        self.hybrid_encoder.to(device)
+
+
+    def forward(self, batch):
         """
         Forward the data though the model.
 
@@ -83,7 +94,7 @@ class GNNGLY(DownstreamGGIN):
             self.charge_encoder[a[3]],
             self.h_encoder[a[4]],
             self.hybrid_encoder[a[5]],
-        ]) for a in x])
+        ]) for a in x]).to(x.device)
 
         # Propagate the data through the model
         for layer in self.layers:

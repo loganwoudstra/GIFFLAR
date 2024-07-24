@@ -6,7 +6,7 @@ from typing import List, Union, Tuple, Optional, Callable, Any, Dict
 import numpy as np
 import pandas as pd
 import torch
-from rdkit import Chem
+from rdkit import Chem, RDLogger
 from rdkit.Chem import rdDepictor
 from torch.utils.data import DataLoader
 from torch_geometric.data import InMemoryDataset, HeteroData
@@ -14,11 +14,23 @@ from pytorch_lightning import LightningDataModule
 import glyles
 from glyles.glycans.factory.factory import MonomerFactory
 from tqdm import tqdm
+import networkx as nx
 
 from gifflar.utils import S3NMerger, nx2mol
 
 Chem.SetDefaultPickleProperties(Chem.PropertyPickleOptions.AllProps)
+RDLogger.DisableLog('rdApp.info')
 
+
+def clean_tree(tree):
+    for node in tree.nodes:
+        attributes = copy.deepcopy(tree.nodes[node])
+        if "type" in attributes and isinstance(attributes["type"], glyles.glycans.mono.monomer.Monomer):
+            tree.nodes[node].clear()
+            tree.nodes[node].update({"iupac": "".join([x[0] for x in attributes["type"].recipe]), "name": attributes["type"].name})
+        else:
+            return None
+    return tree
 
 def iupac2mol(iupac: str) -> Optional[HeteroData]:
     """
@@ -36,23 +48,25 @@ def iupac2mol(iupac: str) -> Optional[HeteroData]:
     merged = S3NMerger(MonomerFactory()).merge(tree, glycan.root_orientation, glycan.start)
     mol = nx2mol(merged)
 
-    # extract the SMILES string and return None if the smiles string is invalid.
-    smiles = Chem.MolToSmiles(mol)
-    if len(smiles) < 10:
-        return None
-
-    # Compute the "true" chirality, i.e., if it's up or down relative to a planar glycan.
     if not mol.GetNumConformers():
         rdDepictor.Compute2DCoords(mol)
     Chem.WedgeMolBonds(mol, mol.GetConformer())
 
-    # Store all information in a HeteroData-object
+    smiles = Chem.MolToSmiles(mol)
+    if len(smiles) < 10 or not isinstance(tree, nx.Graph):
+        return None
+
+    tree = clean_tree(tree)
+
     data = HeteroData()
     data["IUPAC"] = iupac
     data["smiles"] = smiles
     data["mol"] = mol
     data["tree"] = tree
     return data
+
+
+# iupac2mol()
 
 
 # GlyLES produces wrong structure?!, even wrong modifications?
@@ -155,6 +169,8 @@ def hetero_collate(data: Optional[Union[List[List[HeteroData]], List[HeteroData]
         tmp_edge_attr = []
         for i, d in enumerate(data):
             # Collect the edge indices and offset them according to the offsets of their respective nodes
+            if list(d[edge_type].edge_index.shape) == [0]:
+                continue
             tmp_edge_index.append(torch.stack([
                 d[edge_type].edge_index[0] + node_counts[edge_type[0]][i],
                 d[edge_type].edge_index[1] + node_counts[edge_type[2]][i]
@@ -198,9 +214,7 @@ def hetero_collate(data: Optional[Union[List[List[HeteroData]], List[HeteroData]
 
 
 class GlycanStorage:
-    """Helper object to reduce runtime by storing a mapping from already converted IUPAC strings to their
-    HeteroData-objects."""
-    def __init__(self, path: Path = Path("data"), **kwargs: Any):
+    def __init__(self, path: Optional[Path] = None):
         """
         Initialize the wrapper around a dict.
 
@@ -208,7 +222,7 @@ class GlycanStorage:
             path: Path to the directory. If there's a glycan_storage.pkl, it will be used to fill this object,
                 otherwise, such file will be created.
         """
-        self.path = path / "glycan_storage.pkl"
+        self.path = Path(path or "data") / "glycan_storage.pkl"
 
         # Fill the storage from the file
         self.data = self._load()
@@ -385,7 +399,7 @@ class GlycanDataset(InMemoryDataset):
         self.dataset_args = dataset_args
         super().__init__(root=str(Path(root) / f"{filename.stem}_{hash_code}"), transform=transform,
                          pre_transform=pre_transform)
-        self.data = torch.load(self.processed_paths[path_idx])
+        self.data, self.dataset_args = torch.load(self.processed_paths[path_idx])
 
     def __len__(self) -> int:
         """Return the length of the dataset."""
@@ -411,7 +425,7 @@ class GlycanDataset(InMemoryDataset):
         if self.pre_transform is not None:
             data = [self.pre_transform(d) for d in data]
 
-        torch.save(data, self.processed_paths[path_idx])
+        torch.save((data, self.dataset_args), self.processed_paths[path_idx])
 
 
 class PretrainGDs(GlycanDataset):
@@ -497,10 +511,13 @@ class DownstreamGDs(GlycanDataset):
             y.append(d["y"])
             if hasattr(d, "y_oh"):
                 y_oh.append(d["y_oh"])
-        return np.vstack(X), np.concatenate(y), np.vstack(y_oh) if len(y_oh) != 0 else None
+        if isinstance(y[0], int):
+            return np.vstack(X), np.array(y), np.vstack(y_oh) if len(y_oh) != 0 else None
+        else:
+            return np.vstack(X), np.concatenate(y), np.vstack(y_oh) if len(y_oh) != 0 else None
 
     def process(self) -> None:
-        print("Start processing8")
+        print("Start processing")
         """Process the data and store it."""
         data = {k: [] for k in self.splits}
         df = pd.read_csv(self.filename, sep="\t" if self.filename.suffix.lower().endswith(".tsv") else ",")
@@ -508,7 +525,13 @@ class DownstreamGDs(GlycanDataset):
         # If the label is not given, use all columns except IUPAC and split
         if "label" not in self.dataset_args:
             self.dataset_args["label"] = [x for x in df.columns if x not in {"IUPAC", "split"}]
-
+        if self.dataset_args["task"] != "classification":
+            self.dataset_args["num_classes"] = len(self.dataset_args["label"])
+        else:
+            self.dataset_args["num_classes"] = int(max(df[self.dataset_args["label"]].values)) + 1
+        print(self.dataset_args["num_classes"])
+        if self.dataset_args["num_classes"] == 2:
+            self.dataset_args["num_classes"] = 1
         # Load the glycan storage to speed up the preprocessing
         gs = GlycanStorage(Path(self.root).parent)
         for index, (_, row) in tqdm(enumerate(df.iterrows())):

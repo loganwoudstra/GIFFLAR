@@ -115,6 +115,12 @@ class DownstreamGGIN(GlycanGIN):
             self.loss = nn.CrossEntropyLoss()
         self.metrics = get_metrics(self.task, self.output_dim)
 
+    def to(self, device):
+        super(DownstreamGGIN, self).to(device)
+        for split, metric in self.metrics.items():
+            self.metrics[split] = metric.to(device)
+        self.embedding = {k: e.to(device) for k, e in self.embedding.items()}
+
     def forward(self, batch):
         node_embed, graph_embed = super().forward(batch)
         pred = self.head(graph_embed)
