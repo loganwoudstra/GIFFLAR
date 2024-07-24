@@ -123,7 +123,14 @@ class ECFPTransform(RootTransform):
 
 
 class SweetNetTransform(RootTransform):
-    def __init__(self, glycan_lib=lib, **kwargs):
+    def __init__(self, glycan_lib=lib, **kwargs: Any):
+        """
+        Transformation to convert a glycan IUPAC string to a PyG Data object for the SweetNet model.
+
+        Args:
+            glycan_lib: The glycan library to use.
+            kwargs: Additional arguments
+        """
         super().__init__(**kwargs)
         self.glycan_lib = glycan_lib
 
@@ -143,9 +150,10 @@ class LaplacianPE(AddLaplacianEigenvectorPE):
 
     def __init__(self, dim: int, individual: bool = True, **kwargs: Any):
         """
-        :param dim: Number of eigenvectors to compute. (k)
-        :param individual: Whether to compute eigenvectors for each node type individually.
-        :param kwargs: Additional arguments.
+        Args:
+            dim: Number of eigenvectors to compute. (k)
+            individual: Whether to compute eigenvectors for each node type individually.
+            kwargs: Additional arguments.
         """
         super().__init__(k=dim, attr_name=self.attr_name, **kwargs)
         self.max_dim = dim
@@ -177,12 +185,13 @@ class RandomWalkPE(RootTransform):
     """Random walk dense version."""
     attr_name = "rw_pe"
 
-    def __init__(self, dim: int, individual: bool = True, cuda: bool = False, **kwargs):
+    def __init__(self, dim: int, individual: bool = True, cuda: bool = False, **kwargs: Any):
         """
-        :param dim: The number of random walk steps (walk_length).
-        :param individual: Whether to compute eigenvectors for each node type individually.
-        :param cuda: Whether to move the computation to GPU or not
-        :param kwargs: Additional arguments.
+        Args:
+            dim: The number of random walk steps (walk_length).
+            individual: Whether to compute eigenvectors for each node type individually.
+            cuda: Whether to move the computation to GPU or not
+            kwargs: Additional arguments.
         """
         super().__init__(**kwargs)
         self.walk_length = dim

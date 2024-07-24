@@ -1,12 +1,14 @@
 import re
 from pathlib import Path
-from typing import NamedTuple, Optional, Literal, TypedDict
+from typing import NamedTuple, Optional, Literal, TypedDict, Any, Dict
 
 import networkx as nx
+import rdkit.Chem
 from glycowork.glycan_data.loader import lib
 from glyles.glycans.poly.merger import Merger
 from rdkit import Chem
 from rdkit.Chem import BondType
+from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, GradientBoostingRegressor, \
     GradientBoostingClassifier
 from sklearn.multioutput import MultiOutputRegressor, MultiOutputClassifier
@@ -26,9 +28,21 @@ chiral_map = {n: i for i, n in enumerate([
 def get_sl_model(
         name: Literal["rf", "svm", "xgb"],
         task: Literal["regression", "classification", "multilabel"],
-        n_outputs,
-        **kwargs
-):
+        n_outputs: int,
+        **kwargs: Any,
+) -> BaseEstimator:
+    """
+    Retrieve a statistical learning model and initialize it based on the dataset.
+
+    Args:
+        name: The name of the statistical learning model
+        task: The type of the prediction task
+        n_outputs: Number of predictions to be made
+        **kwargs: Additional arguments to the model
+
+    Returns:
+        Ready-to-fit statistical learning model
+    """
     model_args = {k: v for k, v in kwargs["model"].items() if k not in {"name", "featurization"}}
     match name, task, n_outputs:
         case "rf", "regression", _:
@@ -60,7 +74,27 @@ def get_sl_model(
                                       f"not been considered.")
 
 
-def get_metrics(task: Literal["regression", "classification", "multilabel"], n_outputs: int):
+def get_metrics(
+        task: Literal["regression", "classification", "multilabel"],
+        n_outputs: int
+) -> Dict[str, MetricCollection]:
+    """
+    Collect the metrics to monitor a models learning progress. For regression tasks, we monitor
+      - the MSE,
+      - the MAE, and
+      - the R2Score
+    For everything else (single- and multilabel classification) we monitor
+      - the Accuracy,
+      - the AUROC, and
+      - the MCC
+
+    Args:
+        task: The type of the prediction task
+        n_outputs: Number of predictions to be made
+
+    Returns:
+        A dictionary mapping split names to torchmetrics.MetricCollection
+    """
     if task == "regression":
         m = MetricCollection([
             MeanSquaredError(),
@@ -68,6 +102,7 @@ def get_metrics(task: Literal["regression", "classification", "multilabel"], n_o
             R2Score(num_outputs=n_outputs),
         ])
     else:
+        # Based on the number of outputs, the metrics need different arguments
         if n_outputs == 1:
             metric_args = {"task": "binary"}
         elif task != "multilabel":
@@ -82,20 +117,20 @@ def get_metrics(task: Literal["regression", "classification", "multilabel"], n_o
     return {"train": m.clone(prefix="train/"), "val": m.clone(prefix="val/"), "test": m.clone(prefix="test/")}
 
 
-class DatasetInfo(TypedDict):
-    filepath: Optional[Path | str]
-    num_classes: int
-    task: Literal["regression", "classification", "multilabel"]
+def mol2nx(mol: rdkit.Chem.Mol, node: int) -> nx.Graph:
+    """
+    Convert a monosaccharide to a networkx graph.
 
+    Args:
+        The molecule to be converted
+        node: The monosaccharide ID in the whole glycan
 
-class RawDataInfo(NamedTuple):
-    num_classes: int
-    task: Literal["regression", "classification", "multilabel"]
-
-
-def mol2nx(mol, node):
+    Returns:
+        A networkx.Graph representing the molecule with the same properties
+    """
     G = nx.Graph()
 
+    # Convert all the atoms, explicit Hs and Hybridization have to be dropped because they interfere with further steps)
     for atom in mol.GetAtoms():
         G.add_node(
             atom.GetIdx(),
@@ -105,6 +140,7 @@ def mol2nx(mol, node):
             is_aromatic=atom.GetIsAromatic(),
             mono_id=node,
         )
+    # Convert all the bonds
     for bond in mol.GetBonds():
         G.add_edge(
             bond.GetBeginAtomIdx(),
@@ -115,13 +151,29 @@ def mol2nx(mol, node):
     return G
 
 
-def nx2mol(G, sanitize=True):
+def nx2mol(G: nx.Graph, sanitize=True) -> rdkit.Chem.Mol:
+    """
+    Convert a molecules from a networkx.Graph to RDKit.
+
+    Args:
+        G: The graph representing a molecule
+        sanitize: A bool flag indicating to sanitize the resulting molecule (should be True for "production mode" and
+            False when debugging this function)
+
+    Returns:
+        The converted, sanitized molecules in RDKit represented by the input graph
+    """
+    # Create the molecule
     mol = Chem.RWMol()
+
+    # Extract the node attributes
     atomic_nums = nx.get_node_attributes(G, 'atomic_num')
     chiral_tags = nx.get_node_attributes(G, 'chiral_tag')
     formal_charges = nx.get_node_attributes(G, 'formal_charge')
     node_is_aromatics = nx.get_node_attributes(G, 'is_aromatic')
     mono_ids = nx.get_node_attributes(G, 'mono_id')
+
+    # Create all atoms based on their representing nodes
     node_to_idx = {}
     for node in G.nodes():
         a = Chem.Atom(atomic_nums[node])
@@ -132,8 +184,11 @@ def nx2mol(G, sanitize=True):
         idx = mol.AddAtom(a)
         node_to_idx[node] = idx
 
+    # Extract the edge attributes
     bond_types = nx.get_edge_attributes(G, 'bond_type')
     mono_bond_ids = nx.get_edge_attributes(G, 'mono_id')
+
+    # Connect the atoms based on the edges from the graph
     for edge in G.edges():
         first, second = edge
         ifirst = node_to_idx[first]

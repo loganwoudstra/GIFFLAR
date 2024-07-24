@@ -1,6 +1,6 @@
 import urllib.request
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional, Literal
 
 import numpy as np
 import pandas as pd
@@ -9,7 +9,10 @@ from glyles import convert
 from tqdm import tqdm
 
 
-def iupac2smiles(iupac):
+def iupac2smiles(iupac: str) -> Optional[str]:
+    """
+    Convert IUPAC-condensed representations to SMILES strings (or None if the smiles string cannot be valid.
+    """
     if any([x in iupac for x in ["?", "{", "}"]]):
         return None
     try:
@@ -21,46 +24,52 @@ def iupac2smiles(iupac):
         return None
 
 
-def get_taxonomy():
+def get_taxonomy() -> pd.DataFrame:
     """
     Download full taxonomy data, process it, and save it as a tsv file.
     """
     if not (p := Path("taxonomy.tsv")).exists():
         mask = []
+        # convert to IUPAC to SMILES and build a mask to remove not-convertable molecules.
         for i in tqdm(taxonomy["glycan"]):
             smiles = iupac2smiles(i)
-            mask.append(smiles is not None and len(smiles) > 10)
+            mask.append(smiles is not None)
         tax = taxonomy[mask]
         tax.to_csv(p, sep="\t", index=False)
     return pd.read_csv(p, sep="\t")
 
 
-def bitwise_or_agg(arrays):
-    return np.bitwise_or.reduce(arrays)
-
-
-def get_taxonomic_level(level):
+def get_taxonomic_level(
+        level: Literal["Domain", "Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"]
+) -> Path:
     """
     Extract taxonomy data at a specific level, process it, and save it as a tsv file.
+
+    Returns:
+        Path to the TSV file storing the processed dataset.
     """
     if not (p := Path(f"taxonomy_{level}.tsv")).exists():
+        # Chop to taxonomic level of interest and remove invalid rows
         tax = get_taxonomy()[["glycan", level]]
         tax.rename(columns={"glycan": "IUPAC"}, inplace=True)
         tax[tax[level] == "undetermined"] = np.nan
         tax.dropna(inplace=True)
 
+        # One-hot encode the individual classes and collate them for glycans that are the same
         tax = pd.concat([tax["IUPAC"], pd.get_dummies(tax[level])], axis=1)
         tax = tax.groupby('IUPAC').agg("sum").reset_index()
 
+        # Chop prediction values to 0 and 1
         classes = [x for x in tax.columns if x != "IUPAC"]
         tax[classes] = tax[classes].applymap(lambda x: min(1, x))
 
+        # Apply a random split
         tax["split"] = np.random.choice(["train", "val", "test"], tax.shape[0], p=[0.7, 0.2, 0.1])
         tax.to_csv(p, sep="\t", index=False)
     return p
 
 
-def get_immunogenicity():
+def get_immunogenicity() -> Path:
     """
     Download immunogenicity data, process it, and save it as a tsv file.
 
@@ -73,14 +82,18 @@ def get_immunogenicity():
         The filepath of the processed immunogenicity data.
     """
     if not (p := Path("immunogenicity.tsv")).exists():
+        # Download the data
         urllib.request.urlretrieve(
             "https://torchglycan.s3.us-east-2.amazonaws.com/downstream/glycan_immunogenicity.csv",
             "immunogenicity.csv"
         )
+
+        # Process the data and remove unnecessary columns
         df = pd.read_csv("immunogenicity.csv")[["glycan", "immunogenicity"]]
         df.rename(columns={"glycan": "IUPAC"}, inplace=True)
         df.dropna(inplace=True)
 
+        # One-hot encode the individual classes and collate them for glycans that are the same
         classes = {n: i for i, n in enumerate(df["immunogenicity"].unique())}
         df["label"] = df["immunogenicity"].map(classes)
         df["split"] = np.random.choice(["train", "val", "test"], df.shape[0], p=[0.7, 0.2, 0.1])
