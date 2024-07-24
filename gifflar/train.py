@@ -35,6 +35,7 @@ def setup(**kwargs):
         batch_size=kwargs["model"].get("batch_size", 1), transform=None,
         pre_transform=get_pretransforms(**(kwargs["pre-transforms"] or {})), **data_config,
     )
+    data_config["num_classes"] = datamodule.train.dataset_args["num_classes"]
     logger = CSVLogger("logs", name=kwargs["model"]["name"])
     kwargs["dataset"]["filepath"] = str(data_config["filepath"])
     logger.log_hyperparams(kwargs)
@@ -133,7 +134,7 @@ def unfold_config(config):
         for model in models:
             tmp_config = copy.deepcopy(config)
             tmp_config["dataset"] = dataset
-            if not isinstance(tmp_config["dataset"]["label"], list):
+            if "label" in tmp_config["dataset"] and not isinstance(tmp_config["dataset"]["label"], list):
                 tmp_config["dataset"]["label"] = [tmp_config["dataset"]["label"]]
             tmp_config["model"] = model
             yield tmp_config
@@ -155,12 +156,17 @@ def hash_dict(input_dict, n_chars: int = 8):
 def main(config):
     custom_args = read_yaml_config(config)
     for args in unfold_config(custom_args):
-        args["hash"] = hash_dict(args["pre-transforms"])
-        if args["model"]["name"] in ["rf", "svm", "xgb"]:
-            fit(**args)
-        else:
-            train(**args)
-        print("Finished", args["model"]["name"], "on", args["dataset"]["name"])
+        try:
+            args["hash"] = hash_dict(args["pre-transforms"])
+            print(args)
+            if args["model"]["name"] in ["rf", "svm", "xgb"]:
+                fit(**args)
+            else:
+                # continue
+                train(**args)
+            print("Finished", args["model"]["name"], "on", args["dataset"]["name"])
+        except Exception as e:
+            print(args["model"]["name"], "failed on", args["dataset"]["name"], "with", e)
 
 
 if __name__ == '__main__':

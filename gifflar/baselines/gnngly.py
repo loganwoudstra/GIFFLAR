@@ -1,7 +1,6 @@
 import torch
 from torch import nn
 from torch_geometric.nn import GCNConv, global_mean_pool
-from torch_geometric.transforms import BaseTransform
 
 from gifflar.model import DownstreamGGIN
 

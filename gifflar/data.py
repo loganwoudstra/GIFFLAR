@@ -6,7 +6,7 @@ from typing import List, Union, Tuple, Optional, Callable
 import numpy as np
 import pandas as pd
 import torch
-from rdkit import Chem
+from rdkit import Chem, RDLogger
 from rdkit.Chem import rdDepictor
 from torch.utils.data import DataLoader
 from torch_geometric.data import InMemoryDataset, HeteroData
@@ -14,13 +14,26 @@ from pytorch_lightning import LightningDataModule
 import glyles
 from glyles.glycans.factory.factory import MonomerFactory
 from tqdm import tqdm
+import networkx as nx
 
 from gifflar.utils import S3NMerger, nx2mol
 
 Chem.SetDefaultPickleProperties(Chem.PropertyPickleOptions.AllProps)
+RDLogger.DisableLog('rdApp.info')
 
 
-def iupac2mol(iupac: str = "Fuc(a1-4)Gal(a1-4)Glc"):
+def clean_tree(tree):
+    for node in tree.nodes:
+        attributes = copy.deepcopy(tree.nodes[node])
+        if "type" in attributes and isinstance(attributes["type"], glyles.glycans.mono.monomer.Monomer):
+            tree.nodes[node].clear()
+            tree.nodes[node].update({"iupac": "".join([x[0] for x in attributes["type"].recipe]), "name": attributes["type"].name})
+        else:
+            return None
+    return tree
+
+
+def iupac2mol(iupac: str = "FucNAc(a1-4)Gal(a1-4)Glc"):
     glycan = glyles.Glycan(iupac)
     # print(glycan.get_smiles())
     tree = glycan.parse_tree
@@ -32,8 +45,10 @@ def iupac2mol(iupac: str = "Fuc(a1-4)Gal(a1-4)Glc"):
     Chem.WedgeMolBonds(mol, mol.GetConformer())
 
     smiles = Chem.MolToSmiles(mol)
-    if len(smiles) < 10:
+    if len(smiles) < 10 or not isinstance(tree, nx.Graph):
         return None
+
+    tree = clean_tree(tree)
 
     data = HeteroData()
     data["IUPAC"] = iupac
@@ -41,6 +56,9 @@ def iupac2mol(iupac: str = "Fuc(a1-4)Gal(a1-4)Glc"):
     data["mol"] = mol
     data["tree"] = tree
     return data
+
+
+# iupac2mol()
 
 
 # GlyLES produces wrong structure?!, even wrong modifications?
@@ -95,6 +113,8 @@ def hetero_collate(data):
         tmp_edge_index = []
         tmp_edge_attr = []
         for i, d in enumerate(data):
+            if list(d[edge_type].edge_index.shape) == [0]:
+                continue
             tmp_edge_index.append(torch.stack([
                 d[edge_type].edge_index[0] + node_counts[edge_type[0]][i],
                 d[edge_type].edge_index[1] + node_counts[edge_type[2]][i]
@@ -141,7 +161,8 @@ class GlycanStorage:
     def query(self, iupac):
         if iupac not in self.data:
             try:
-                self.data[iupac] = iupac2mol(iupac)
+                tmp = iupac2mol(iupac)
+                self.data[iupac] = tmp
             except:
                 self.data[iupac] = None
         return copy.deepcopy(self.data[iupac])
@@ -208,7 +229,7 @@ class GlycanDataset(InMemoryDataset):
         self.dataset_args = dataset_args
         super().__init__(root=str(Path(root) / f"{filename.stem}_{hash_code}"), transform=transform,
                          pre_transform=pre_transform)
-        self.data = torch.load(self.processed_paths[path_idx])
+        self.data, self.dataset_args = torch.load(self.processed_paths[path_idx])
 
     def __len__(self):
         return self.data.__len__()
@@ -229,7 +250,7 @@ class GlycanDataset(InMemoryDataset):
         if self.pre_transform is not None:
             data = [self.pre_transform(d) for d in data]
 
-        torch.save(data, self.processed_paths[path_idx])
+        torch.save((data, self.dataset_args), self.processed_paths[path_idx])
 
 
 class PretrainGDs(GlycanDataset):
@@ -282,13 +303,23 @@ class DownstreamGDs(GlycanDataset):
             y.append(d["y"])
             if hasattr(d, "y_oh"):
                 y_oh.append(d["y_oh"])
-        return np.vstack(X), np.concatenate(y), np.vstack(y_oh) if len(y_oh) != 0 else None
+        if isinstance(y[0], int):
+            return np.vstack(X), np.array(y), np.vstack(y_oh) if len(y_oh) != 0 else None
+        else:
+            return np.vstack(X), np.concatenate(y), np.vstack(y_oh) if len(y_oh) != 0 else None
 
     def process(self):
         data = {k: [] for k in self.splits}
         df = pd.read_csv(self.filename, sep="\t" if self.filename.suffix.lower().endswith(".tsv") else ",")
         if "label" not in self.dataset_args:
             self.dataset_args["label"] = [x for x in df.columns if x not in {"IUPAC", "split"}]
+        if self.dataset_args["task"] != "classification":
+            self.dataset_args["num_classes"] = len(self.dataset_args["label"])
+        else:
+            self.dataset_args["num_classes"] = int(max(df[self.dataset_args["label"]].values)) + 1
+        print(self.dataset_args["num_classes"])
+        if self.dataset_args["num_classes"] == 2:
+            self.dataset_args["num_classes"] = 1
         gs = GlycanStorage(Path(self.root).parent)
         for index, (_, row) in tqdm(enumerate(df.iterrows())):
             d = gs.query(row["IUPAC"])

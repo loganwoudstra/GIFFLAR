@@ -86,7 +86,7 @@ class GIFFLARTransform(RootTransform):
             [(bond1, bond2) for ring in data["mol"].GetRingInfo().BondRings() for bond1 in ring for bond2 in ring if
              bond1 != bond2], dtype=torch.long).T
         data["monosacchs"].x = torch.tensor([
-            lib_map.get(data["tree"].nodes[node]["type"].name, len(lib_map)) for node in data["tree"].nodes
+            lib_map.get(data["tree"].nodes[node]["name"], len(lib_map)) for node in data["tree"].nodes
         ])
         data["monosacchs"].num_nodes = len(data["monosacchs"].x)
         data["monosacchs", "boundary", "monosacchs"].edge_index = []
@@ -132,7 +132,7 @@ class SweetNetTransform(RootTransform):
             d = from_networkx(glycan_to_nxGraph(data["IUPAC"], self.glycan_lib))
         except:
             d = from_networkx(glycan_to_nxGraph("Gal", self.glycan_lib))
-        data["sweetnet_x"] = torch.tensor(d["labels"]).reshape(-1, 1)
+        data["sweetnet_x"] = d["labels"].clone().detach().reshape(-1, 1)
         data["sweetnet_num_nodes"] = len(data["sweetnet_x"])
         data["sweetnet_edge_index"] = d.edge_index
         return data

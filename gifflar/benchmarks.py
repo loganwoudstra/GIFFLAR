@@ -56,6 +56,7 @@ def get_taxonomic_level(level):
         tax[classes] = tax[classes].applymap(lambda x: min(1, x))
 
         tax["split"] = np.random.choice(["train", "val", "test"], tax.shape[0], p=[0.7, 0.2, 0.1])
+        # tax.drop(level, axis=1, inplace=True)
         tax.to_csv(p, sep="\t", index=False)
     return p
 
@@ -85,6 +86,7 @@ def get_immunogenicity():
         df["label"] = df["immunogenicity"].map(classes)
         df["split"] = np.random.choice(["train", "val", "test"], df.shape[0], p=[0.7, 0.2, 0.1])
 
+        df.drop("immunogenicity", axis=1, inplace=True)
         df.to_csv(p, sep="\t", index=False)
         with open("immunogenicity_classes.tsv", "w") as f:
             for n, i in classes.items():
@@ -114,9 +116,10 @@ def get_glycosylation():
         df.dropna(inplace=True)
 
         classes = {n: i for i, n in enumerate(df["link"].unique())}
-        df["label"] = df["ling"].map(classes)
+        df["label"] = df["link"].map(classes)
         df["split"] = np.random.choice(["train", "val", "test"], df.shape[0], p=[0.7, 0.2, 0.1])
 
+        df.drop("link", axis=1, inplace=True)
         df.to_csv(p, sep="\t", index=False)
         with open("glycosylation_classes.tsv", "w") as f:
             for n, i in classes.items():
@@ -140,13 +143,14 @@ def get_dataset(data_config) -> Dict:
             path = root / f"{name_fracs[0].replace('-', '_')}.csv"
         case _:  # Unknown dataset
             raise ValueError(f"Unknown dataset {data_config['name']}.")
-    if data_config["task"] in {"regression", "multilabel"}:
-        data_config["num_classes"] = len(data_config["label"])
-    else:
-        data_config["num_classes"] = int(pd.read_csv(
-            path, sep="\t" if path.suffix.lower().endswith(".tsv") else ","
-        )[data_config["label"]].values.max() + 1)
-        if data_config["num_classes"] == 2:
-            data_config["num_classes"] = 1
+    # if "label" in data_config:
+    #     if data_config["task"] in {"regression", "multilabel"}:
+    #         data_config["num_classes"] = len(data_config["label"])
+    #     else:
+    #         data_config["num_classes"] = int(pd.read_csv(
+    #             path, sep="\t" if path.suffix.lower().endswith(".tsv") else ","
+    #         )[data_config["label"]].values.max() + 1)
+    #         if data_config["num_classes"] == 2:
+    #             data_config["num_classes"] = 1
     data_config["filepath"] = path
     return data_config
