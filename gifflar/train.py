@@ -156,17 +156,17 @@ def hash_dict(input_dict, n_chars: int = 8):
 def main(config):
     custom_args = read_yaml_config(config)
     for args in unfold_config(custom_args):
-        try:
-            args["hash"] = hash_dict(args["pre-transforms"])
-            print(args)
-            if args["model"]["name"] in ["rf", "svm", "xgb"]:
-                fit(**args)
-            else:
-                # continue
-                train(**args)
-            print("Finished", args["model"]["name"], "on", args["dataset"]["name"])
-        except Exception as e:
-            print(args["model"]["name"], "failed on", args["dataset"]["name"], "with", e)
+        # try:
+        args["hash"] = hash_dict(args["pre-transforms"])
+        print(args)
+        if args["model"]["name"] in ["rf", "svm", "xgb"]:
+            fit(**args)
+        else:
+            # continue
+            train(**args)
+        print("Finished", args["model"]["name"], "on", args["dataset"]["name"])
+        # except Exception as e:
+        #     print(args["model"]["name"], "failed on", args["dataset"]["name"], "with", f"\"{e}\"")
 
 
 if __name__ == '__main__':

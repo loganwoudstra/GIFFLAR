@@ -7,6 +7,7 @@ import pandas as pd
 from glycowork.glycan_data.loader import df_species as taxonomy
 from glyles import convert
 from tqdm import tqdm
+from datasail.sail import datasail
 
 
 def iupac2smiles(iupac: str) -> Optional[str]:
@@ -63,8 +64,34 @@ def get_taxonomic_level(
         classes = [x for x in tax.columns if x != "IUPAC"]
         tax[classes] = tax[classes].applymap(lambda x: min(1, x))
 
+        # Remove all columns with less than 5 members. 3 would also work, but that has potentially not valid split
+        # tax.drop(np.array(classes)[tax[classes].sum() < 5], axis="columns", inplace=True)
+        # classes = [x for x in tax.columns if x != "IUPAC"]
+        # remove all glycans that are not part of any class in the columns
+        # tax = tax[tax[classes].sum(axis=1) > 0]
+        # print(tax.shape)
+
         # Apply a random split
+        # strats = dict(zip(tax["IUPAC"], tax[classes].apply(lambda row: "".join([str(row[c]) for c in classes]), axis=1)))
+        # e_split, _, _ = datasail(
+        #     techniques=["I1e"],
+        #     splits=[7, 2, 1],
+        #     names=["train", "val", "test"],
+        #     e_type="O",
+        #     e_data=dict(zip(tax["IUPAC"], tax["IUPAC"])),
+        #     e_strat=strats,
+        #     delta=0.3,
+        # )
+        # tax["split"] = tax["IUPAC"].map(e_split["I1e"][0])
+        print(tax.shape)
         tax["split"] = np.random.choice(["train", "val", "test"], tax.shape[0], p=[0.7, 0.2, 0.1])
+        mask = ((tax[tax["split"] == "train"][classes].sum() == 0) |
+                (tax[tax["split"] == "val"][classes].sum() == 0) |
+                (tax[tax["split"] == "test"][classes].sum() == 0))
+        tax.drop(columns=np.array(classes)[mask], inplace=True)
+        classes = [x for x in tax.columns if x not in {"IUPAC", "split"}]
+        tax = tax[tax[classes].sum(axis=1) > 0]
+        print(tax.shape)
         # tax.drop(level, axis=1, inplace=True)
         tax.to_csv(p, sep="\t", index=False)
     return p

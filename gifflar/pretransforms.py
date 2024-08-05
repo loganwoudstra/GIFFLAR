@@ -4,7 +4,7 @@ from typing import Any
 import torch
 from glycowork.glycan_data.loader import lib
 from glycowork.motif.graph import glycan_to_nxGraph
-from rdkit.Chem import rdFingerprintGenerator
+from rdkit.Chem import AllChem, rdFingerprintGenerator
 from torch_geometric import transforms as T
 from torch_geometric.data import Data
 from torch_geometric.transforms import Compose, AddLaplacianEigenvectorPE
@@ -118,7 +118,8 @@ class ECFPTransform(RootTransform):
         self.ecfp = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=1024)
 
     def __call__(self, data):
-        data["fp"] = torch.tensor(self.ecfp.GetFingerprint(data["mol"]), dtype=torch.float).reshape(1, -1)
+        # data["fp"] = torch.tensor(self.ecfp.GetFingerprint(data["mol"]), dtype=torch.float).reshape(1, -1)
+        data["fp"] = torch.tensor(AllChem.GetMorganFingerprintAsBitVect(data["mol"], 2, nBits=1024), dtype=torch.float).reshape(1, -1)
         return data
 
 

@@ -1,5 +1,7 @@
 import copy
+import pathlib
 import pickle
+import sys
 from pathlib import Path
 from typing import List, Union, Tuple, Optional, Callable, Any, Dict
 
@@ -20,6 +22,11 @@ from gifflar.utils import S3NMerger, nx2mol
 
 Chem.SetDefaultPickleProperties(Chem.PropertyPickleOptions.AllProps)
 RDLogger.DisableLog('rdApp.info')
+
+# If working on windows as there are problems with PosixPaths
+if sys.platform.startswith("win"):
+    tmp = pathlib.PosixPath
+    pathlib.PosixPath = pathlib.WindowsPath
 
 
 def clean_tree(tree):
