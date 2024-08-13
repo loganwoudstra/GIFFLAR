@@ -1,5 +1,5 @@
 import copy
-from typing import Any
+from typing import Any, Union
 
 import torch
 from glycowork.glycan_data.loader import lib
@@ -11,10 +11,11 @@ except ImportError:
     from rdkit.Chem import AllChem
     RDKIT_GEN = False
 from torch_geometric import transforms as T
-from torch_geometric.data import Data
+from torch_geometric.data import Data, HeteroData
 from torch_geometric.transforms import Compose, AddLaplacianEigenvectorPE
 from torch_geometric.transforms.base_transform import BaseTransform
 from torch_geometric.utils import from_networkx, to_dense_adj
+from tqdm import tqdm
 
 from gifflar.utils import bond_map, lib_map, atom_map
 
@@ -248,6 +249,18 @@ class RandomWalkPE(RootTransform):
         return data
 
 
+class TQDMCompose(Compose):
+    def forward(self, data: Union[Data, HeteroData]):
+        with tqdm(total=len(self.transforms), desc="Transforms") as t_bar:
+            for transform in self.transforms:
+                if isinstance(data, (list, tuple)):
+                    data = transform(data)
+                else:
+                    data = [transform(d) for d in tqdm(data, total=len(data), desc="Samples", leave=False)]
+                t_bar.update(1)
+        return data
+
+
 def get_pretransforms(**pre_transform_args) -> [T.Compose]:
     pre_transforms = [
         GIFFLARTransform(**pre_transform_args.get("GIFFLARTransform", {})),
@@ -261,4 +274,4 @@ def get_pretransforms(**pre_transform_args) -> [T.Compose]:
             pre_transforms.append(LaplacianPE(**args))
         if name == "RandomWalkPE":
             pre_transforms.append(RandomWalkPE(**args))
-    return Compose(pre_transforms)
+    return TQDMCompose(pre_transforms)
