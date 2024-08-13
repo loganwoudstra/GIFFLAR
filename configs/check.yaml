@@ -1,6 +1,6 @@
 seed: 42
-data_dir: .
-root_dir: .
+data_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/
+root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data
 datasets:
   - name: Taxonomy_Phylum
     task: multilabel

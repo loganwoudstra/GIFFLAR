@@ -31,6 +31,9 @@ class GNNGLY(DownstreamGGIN):
         """
         super().__init__(14, output_dim, task)
 
+        del self.convs
+        del self.head
+
         # Define the encoders (sizes based on table 1)
         self.atom_encoder = torch.eye(101)
         self.chiral_encoder = torch.eye(4)

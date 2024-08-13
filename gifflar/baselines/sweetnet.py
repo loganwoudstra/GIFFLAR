@@ -22,6 +22,9 @@ class SweetNetLightning(DownstreamGGIN):
         """
         super().__init__(hidden_dim, output_dim, task)
 
+        del self.convs
+        del self.head
+
         # Load the untrained model from glycowork
         self.model = prep_model("SweetNet", output_dim, hidden_dim=hidden_dim)
 

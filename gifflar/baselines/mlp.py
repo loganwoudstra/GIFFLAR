@@ -6,6 +6,11 @@ from gifflar.model import DownstreamGGIN
 
 
 class MLP(DownstreamGGIN):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        del self.convs
+
     def forward(self, batch) -> Dict[str, torch.Tensor]:
         """
         Make predictions based on the molecular fingerprint.

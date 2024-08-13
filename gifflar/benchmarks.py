@@ -7,7 +7,7 @@ import pandas as pd
 from glycowork.glycan_data.loader import df_species as taxonomy
 from glyles import convert
 from tqdm import tqdm
-from datasail.sail import datasail
+# from datasail.sail import datasail
 
 
 def iupac2smiles(iupac: str) -> Optional[str]:

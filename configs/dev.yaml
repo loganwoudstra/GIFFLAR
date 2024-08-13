@@ -8,6 +8,8 @@ datasets:
     task: classification
   - name: Taxonomy_Domain
     task: multilabel
+  - name: Taxonomy_Kingdom
+    task: multilabel
   - name: Taxonomy_Phylum
     task: multilabel
   - name: Taxonomy_Class
@@ -33,30 +35,31 @@ model:
   # - name: mlp
   #   hidden_dim: 1024
   #   batch_size: 256
-  #   num_layers: 3
-  #   epochs: 100
+  #   num_layers: 4
+  #   epochs: 1
   #   patience: 30
   #   learning_rate: 0
   #   optimizer: Adam
-  - name: sweetnet
-    hidden_dim: 768
-    batch_size: 256
-    epochs: 50
-    patience: 30
-    learning_rate: 0.001
-    optimizer: Adam
+  # - name: sweetnet
+  #   hidden_dim: 1024
+  #   batch_size: 256
+  #   epochs: 100
+  #   patience: 30
+  #   learning_rate: 0.001
+  #   optimizer: Adam
   # - name: gnngly
   #   hidden_dim: 14
   #   batch_size: 256
   #   num_layers: 5
-  #   epochs: 200
+  #   epochs: 1
   #   patience: 30
   #   learning_rate: 0
   #   optimizer: Adam
   - name: gifflar
-    hidden_dim: 768
+    hidden_dim: 1024
     batch_size: 32
-    num_layers: 6
+    num_layers: 12
     epochs: 100
     learning_rate: 0.001
     optimizer: Adam
+
