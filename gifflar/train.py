@@ -36,7 +36,7 @@ def setup(**kwargs):
         pre_transform=get_pretransforms(**(kwargs["pre-transforms"] or {})), **data_config,
     )
     data_config["num_classes"] = datamodule.train.dataset_args["num_classes"]
-    logger = CSVLogger("logs", name=kwargs["model"]["name"] + kwargs["model"].get("suffix", ""))
+    logger = CSVLogger(kwargs["logs_dir"], name=kwargs["model"]["name"] + kwargs["model"].get("suffix", ""))
     kwargs["dataset"]["filepath"] = str(data_config["filepath"])
     logger.log_hyperparams(kwargs)
     metrics = get_metrics(data_config["task"], data_config["num_classes"])

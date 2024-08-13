@@ -4,7 +4,12 @@ from typing import Any
 import torch
 from glycowork.glycan_data.loader import lib
 from glycowork.motif.graph import glycan_to_nxGraph
-from rdkit.Chem import AllChem, rdFingerprintGenerator
+try:
+    from rdkit.Chem import rdFingerprintGenerator
+    RDKIT_GEN = True
+except ImportError:
+    from rdkit.Chem import AllChem
+    RDKIT_GEN = False
 from torch_geometric import transforms as T
 from torch_geometric.data import Data
 from torch_geometric.transforms import Compose, AddLaplacianEigenvectorPE
@@ -124,11 +129,14 @@ class GNNGLYTransform(RootTransform):
 class ECFPTransform(RootTransform):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.ecfp = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=1024)
+        if RDKIT_GEN:
+            self.ecfp = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=1024)
 
     def __call__(self, data):
-        # data["fp"] = torch.tensor(self.ecfp.GetFingerprint(data["mol"]), dtype=torch.float).reshape(1, -1)
-        data["fp"] = torch.tensor(AllChem.GetMorganFingerprintAsBitVect(data["mol"], 2, nBits=1024), dtype=torch.float).reshape(1, -1)
+        if RDKIT_GEN:
+            data["fp"] = torch.tensor(self.ecfp.GetFingerprint(data["mol"]), dtype=torch.float).reshape(1, -1)
+        else:
+            data["fp"] = torch.tensor(AllChem.GetMorganFingerprintAsBitVect(data["mol"], 2, nBits=1024), dtype=torch.float).reshape(1, -1)
         return data
 
 
@@ -170,12 +178,14 @@ class LaplacianPE(AddLaplacianEigenvectorPE):
         self.individual = individual
 
     def __call__(self, data):
-        print("LaplacianPE")
         if self.individual:
             for d, name in zip(split_hetero_graph(data), ["atoms", "bonds", "monosacchs"]):
                 if d["num_nodes"] <= self.max_dim:
                     self.k = min(d["num_nodes"] - 1, self.max_dim)
-                    super(LaplacianPE, self).forward(d)
+                    if self.k == 0:
+                        d[self.attr_name] = torch.tensor([[]])
+                    else:
+                        super(LaplacianPE, self).forward(d)
                     pad = torch.zeros(d["num_nodes"], self.max_dim - d[self.attr_name].size(1))
                     d[self.attr_name] = torch.cat([d[self.attr_name], pad], dim=1)
                     self.k = self.max_dim
@@ -209,6 +219,9 @@ class RandomWalkPE(RootTransform):
         self.cuda = cuda
 
     def forward(self, data: Data) -> Data:
+        if data["num_nodes"] == 1:
+            data[self.attr_name] = torch.zeros(1, 20)
+            return data
         adj = to_dense_adj(data.edge_index, max_num_nodes=data["num_nodes"]).squeeze(0)
         row_sums = adj.sum(dim=1, keepdim=True)
         adj = adj / row_sums.clamp(min=1)
@@ -222,7 +235,6 @@ class RandomWalkPE(RootTransform):
         return data
 
     def __call__(self, data):
-        print("RandomWalkPE")
         if self.individual:
             for d, name in zip(split_hetero_graph(data), ["atoms", "bonds", "monosacchs"]):
                 self.forward(d)

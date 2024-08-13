@@ -109,8 +109,8 @@ class HeteroDataBatch:
                 for key, value in v.items():
                     if hasattr(value, "to"):
                         v[key] = value.to(device)
-            else:
-                raise ValueError(f"Attribute {k} cannot be converted to device {device}.")
+            # else:
+            #     raise ValueError(f"Attribute {k} cannot be converted to device {device}.")
         return self
 
     def __getitem__(self, item: str) -> Any:

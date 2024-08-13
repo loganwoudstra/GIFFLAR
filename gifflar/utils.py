@@ -15,6 +15,8 @@ from sklearn.multioutput import MultiOutputRegressor, MultiOutputClassifier
 from sklearn.svm import LinearSVR, SVC, SVR
 from torchmetrics import MetricCollection, Accuracy, AUROC, MatthewsCorrCoef, MeanAbsoluteError, MeanSquaredError, \
     R2Score
+from gifflar.metrics import Sensitivity
+
 
 # MASK: +1 | Other: +2 => len(...) | len(...) + 1
 atom_map = {6: 0, 7: 1, 8: 2, 15: 3, 16: 4}
