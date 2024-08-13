@@ -1,0 +1,50 @@
+seed: 42
+data_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/
+root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data
+datasets:
+  - name: Taxonomy_Phylum
+    task: multilabel
+pre-transforms:
+model:
+  - name: sweetnet
+    hidden_dim: 1024
+    batch_size: 256
+    epochs: 1
+    patience: 30
+    learning_rate: 0.001
+    optimizer: Adam
+    suffix: _1024
+  - name: gnngly
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 16
+    epochs: 1
+    patience: 30
+    learning_rate: 0
+    optimizer: Adam
+    suffix: _1024_16
+  - name: gnngly
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 16
+    epochs: 1
+    patience: 30
+    learning_rate: 0
+    optimizer: Adam
+    suffix: _1024_16
+  - name: gifflar
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 8
+    epochs: 1
+    learning_rate: 0.001
+    optimizer: Adam
+    suffix: _1024_8
+  - name: gifflar
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 8
+    epochs: 1
+    learning_rate: 0.001
+    optimizer: Adam
+    suffix: _1024_8

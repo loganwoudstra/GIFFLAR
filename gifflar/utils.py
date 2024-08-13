@@ -85,8 +85,9 @@ def get_metrics(
       - the R2Score
     For everything else (single- and multilabel classification) we monitor
       - the Accuracy,
-      - the AUROC, and
-      - the MCC
+      - the AUROC,
+      - the MCC, and
+      - the Sensitivity, i.e. the TPR
 
     Args:
         task: The type of the prediction task
@@ -113,6 +114,7 @@ def get_metrics(
             Accuracy(**metric_args),
             AUROC(**metric_args),
             MatthewsCorrCoef(**metric_args),
+            Sensitivity(**metric_args),
         ])
     return {"train": m.clone(prefix="train/"), "val": m.clone(prefix="val/"), "test": m.clone(prefix="test/")}
 
