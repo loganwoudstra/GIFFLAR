@@ -85,7 +85,7 @@ class GIFFLARTransform(RootTransform):
         data["bonds", "coboundary", "bonds"].edge_index = torch.tensor(
             [(bond1, bond2) for ring in data["mol"].GetRingInfo().BondRings() for bond1 in ring for bond2 in ring if
              bond1 != bond2], dtype=torch.long).T
-        data["monosacchs"].x = torch.tensor([
+        data["monosacchs"].x = torch.tensor([  # This does not make sense. The monomer-ids are categorical features
             lib_map.get(data["tree"].nodes[node]["name"], len(lib_map)) for node in data["tree"].nodes
         ])
         data["monosacchs"].num_nodes = len(data["monosacchs"].x)
@@ -98,15 +98,24 @@ class GIFFLARTransform(RootTransform):
 
 
 class GNNGLYTransform(RootTransform):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.atom_encoder = torch.eye(101)
+        self.chiral_encoder = torch.eye(4)
+        self.degree_encoder = torch.eye(13)
+        self.charge_encoder = torch.eye(5)
+        self.h_encoder = torch.eye(5)
+        self.hybrid_encoder = torch.eye(5)
+
     def __call__(self, data):
-        data["gnngly_x"] = torch.tensor([[
-            min(atom.GetAtomicNum(), 100),
-            min(atom.GetChiralTag(), 3),
-            min(atom.GetDegree(), 12),
-            min(atom.GetFormalCharge(), 4),
-            min(atom.GetTotalNumHs(), 4),
-            min(atom.GetHybridization(), 4),
-        ] for atom in data["mol"].GetAtoms()])
+        data["gnngly_x"] = torch.stack([torch.concat([
+            self.atom_encoder[min(atom.GetAtomicNum(), 100)],
+            self.chiral_encoder[min(atom.GetChiralTag(), 3)],
+            self.degree_encoder[min(atom.GetDegree(), 12)],
+            self.charge_encoder[min(atom.GetFormalCharge(), 4)],
+            self.h_encoder[min(atom.GetTotalNumHs(), 4)],
+            self.hybrid_encoder[min(atom.GetHybridization(), 4)],
+        ]) for atom in data["mol"].GetAtoms()])
         data["gnngly_num_nodes"] = len(data["gnngly_x"])
         data["gnngly_edge_index"] = copy.deepcopy(data["atoms", "coboundary", "atoms"].edge_index)
         return data

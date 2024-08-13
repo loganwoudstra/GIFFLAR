@@ -34,14 +34,6 @@ class GNNGLY(DownstreamGGIN):
         del self.convs
         del self.head
 
-        # Define the encoders (sizes based on table 1)
-        self.atom_encoder = torch.eye(101)
-        self.chiral_encoder = torch.eye(4)
-        self.degree_encoder = torch.eye(13)
-        self.charge_encoder = torch.eye(5)
-        self.h_encoder = torch.eye(5)
-        self.hybrid_encoder = torch.eye(5)
-
         # Five layers of plain graph convolution with a hidden dimension of 14.
         self.layers = [
             GCNConv(133, 14),
@@ -66,12 +58,6 @@ class GNNGLY(DownstreamGGIN):
     def to(self, device):
         super(GNNGLY, self).to(device)
         self.layers = [l.to(device) for l in self.layers]
-        self.atom_encoder.to(device)
-        self.chiral_encoder.to(device)
-        self.degree_encoder.to(device)
-        self.charge_encoder.to(device)
-        self.h_encoder.to(device)
-        self.hybrid_encoder.to(device)
 
 
     def forward(self, batch):
@@ -88,16 +74,6 @@ class GNNGLY(DownstreamGGIN):
         x = batch["gnngly_x"]
         batch_ids = batch["gnngly_batch"]
         edge_index = batch["gnngly_edge_index"]
-
-        # Compute the atom-wise encodings
-        x = torch.stack([torch.concat([
-            self.atom_encoder[a[0]],
-            self.chiral_encoder[a[1]],
-            self.degree_encoder[a[2]],
-            self.charge_encoder[a[3]],
-            self.h_encoder[a[4]],
-            self.hybrid_encoder[a[5]],
-        ]) for a in x]).to(x.device)
 
         # Propagate the data through the model
         for layer in self.layers:

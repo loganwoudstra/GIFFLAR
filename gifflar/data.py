@@ -18,6 +18,7 @@ from glyles.glycans.factory.factory import MonomerFactory
 from tqdm import tqdm
 import networkx as nx
 
+from gifflar.pretransforms import GIFFLARTransform
 from gifflar.utils import S3NMerger, nx2mol
 
 Chem.SetDefaultPickleProperties(Chem.PropertyPickleOptions.AllProps)
@@ -108,6 +109,8 @@ class HeteroDataBatch:
                 for key, value in v.items():
                     if hasattr(value, "to"):
                         v[key] = value.to(device)
+            else:
+                raise ValueError(f"Attribute {k} cannot be converted to device {device}.")
         return self
 
     def __getitem__(self, item: str) -> Any:
@@ -441,8 +444,6 @@ class PretrainGDs(GlycanDataset):
             root: str | Path,
             filename: str | Path,
             hash_code: str,
-            transform: Optional[Callable] = None,
-            pre_transform: Optional[Callable] = None,
             **dataset_args
     ):
         """
@@ -456,8 +457,8 @@ class PretrainGDs(GlycanDataset):
             pre_transform: The pre-transform to apply to the data
             **dataset_args: Additional arguments to pass to the dataset
         """
-        super().__init__(root=root, filename=filename, hash_code=hash_code, transform=transform,
-                         pre_transform=pre_transform, **dataset_args)
+        super().__init__(root=root, filename=filename, hash_code=hash_code,
+                         pre_transform=GIFFLARTransform(), **dataset_args)
 
     @property
     def processed_file_names(self) -> Union[str, List[str], Tuple[str, ...]]:
@@ -467,7 +468,14 @@ class PretrainGDs(GlycanDataset):
     def process(self):
         """Process the data and store it."""
         data = []
-        # to be implemented
+        gs = GlycanStorage(Path(self.root).parent)
+        df = pd.read_csv(self.filename, sep="\t" if self.filename.suffix.lower().endswith(".tsv") else ",")
+        for index, (_, row) in tqdm(enumerate(df.iterrows())):
+            d = gs.query(row["IUPAC"])
+            d["ID"] = index
+            data.append(d)
+        gs.close()
+        print("Processed", len(data), "entries")
         self.process_(data)
 
 
