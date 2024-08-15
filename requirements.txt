@@ -5,7 +5,7 @@ scikit-learn
 numpy
 pandas
 git+https://github.com/KalininaLab/glyles.git
-git+https://github.com/BojarLab/glycowork.git@ab73b62d7d500d321592cca20cdf3b8507f60026
+git+https://github.com/BojarLab/glycowork.git@3b8a6619ecc4b256cb28b43a47f17ef7df0ecaf3
 jsonargparse
 rich
 pytorch-lightning

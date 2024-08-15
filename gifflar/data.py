@@ -224,7 +224,7 @@ def hetero_collate(data: Optional[Union[List[List[HeteroData]], List[HeteroData]
 
 
 class GlycanStorage:
-    def __init__(self, path: Optional[Path] = None):
+    def __init__(self, path: Optional[Path | str] = None):
         """
         Initialize the wrapper around a dict.
 
