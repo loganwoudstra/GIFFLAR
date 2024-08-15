@@ -433,7 +433,8 @@ class GlycanDataset(InMemoryDataset):
         if self.pre_filter is not None:
             data = [d for d in data if self.pre_filter(d)]
         if self.pre_transform is not None:
-            data = [self.pre_transform(d) for d in data]
+            # data = [self.pre_transform(d) for d in data]
+            data = self.pre_transform(data)
 
         torch.save((data, self.dataset_args), self.processed_paths[path_idx])
 

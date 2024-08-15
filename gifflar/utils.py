@@ -116,7 +116,7 @@ def get_metrics(
             Accuracy(**metric_args),
             AUROC(**metric_args),
             MatthewsCorrCoef(**metric_args),
-            Sensitivity(**metric_args),
+            # Sensitivity(**metric_args),
         ])
     return {"train": m.clone(prefix="train/"), "val": m.clone(prefix="val/"), "test": m.clone(prefix="test/")}
 

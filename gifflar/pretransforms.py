@@ -251,13 +251,22 @@ class RandomWalkPE(RootTransform):
 
 class TQDMCompose(Compose):
     def forward(self, data: Union[Data, HeteroData]):
-        with tqdm(total=len(self.transforms), desc="Transforms") as t_bar:
-            for transform in self.transforms:
-                if isinstance(data, (list, tuple)):
-                    data = transform(data)
-                else:
-                    data = [transform(d) for d in tqdm(data, total=len(data), desc="Samples", leave=False)]
-                t_bar.update(1)
+        # print(self.transforms)
+        # print(len(self.transforms))
+        # print(len(data))
+        # with tqdm(total=len(self.transforms), desc="Transforms") as t_bar:
+        for transform in tqdm(self.transforms, desc=f"Transform"):
+            if not isinstance(data, (list, tuple)):
+                data = transform(data)
+            else:
+                # data = [transform(d) for d in data]
+                t_data = []
+                for d in tqdm(data, leave=False):
+                    t_data.append(transform(d))
+                data = t_data
+                    # s_bar.update(1)
+                # data = [transform(d) for d in tqdm(data, total=len(data), desc="Samples", leave=False)]
+                # t_bar.update(1)
         return data
 
 
