@@ -31,7 +31,7 @@ pre-transforms:
 model:
   - name: gifflar
     hidden_dim: 1024
-    batch_size: 512
+    batch_size: 256
     num_layers: 8
     epochs: 100
     learning_rate: 0.001

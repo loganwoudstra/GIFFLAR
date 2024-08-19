@@ -33,6 +33,16 @@ pre_transforms = {
 }
 
 
+class MultiEmbedding(nn.Module):
+    def __init__(self, embeddings: dict[str, nn.Embedding]):
+        super().__init__()
+        for name, embedding in embeddings.items():
+            setattr(self, name, embedding)
+
+    def forward(self, input_, name):
+        return getattr(self, name).forward(input_)
+
+
 class GlycanGIN(LightningModule):
     def __init__(self, hidden_dim: int, num_layers: int, task: Literal["regression", "classification", "multilabel"],
                  pre_transform_args: Optional[Dict] = None):
@@ -44,11 +54,11 @@ class GlycanGIN(LightningModule):
                 self.addendum.append(pre_transforms[name].attr_name)
                 rand_dim -= args["dim"]
 
-        self.embedding = {
+        self.embedding = MultiEmbedding({
             "atoms": nn.Embedding(len(atom_map) + 2, rand_dim),
             "bonds": nn.Embedding(len(bond_map) + 2, rand_dim),
             "monosacchs": nn.Embedding(len(lib) + 2, rand_dim),
-        }
+        })
 
         self.convs = torch.nn.ModuleList()
         for _ in range(num_layers):
@@ -69,7 +79,7 @@ class GlycanGIN(LightningModule):
     def forward(self, batch):
         for key in batch.x_dict.keys():
             # Compute random encodings for the atom type and include positional encodings
-            pes = [self.embedding[key](batch.x_dict[key])]
+            pes = [self.embedding.forward(batch.x_dict[key], key)]
             for pe in self.addendum:
                 pes.append(batch[f"{key}_{pe}"])
 
@@ -119,7 +129,7 @@ class DownstreamGGIN(GlycanGIN):
         super(DownstreamGGIN, self).to(device)
         for split, metric in self.metrics.items():
             self.metrics[split] = metric.to(device)
-        self.embedding = {k: e.to(device) for k, e in self.embedding.items()}
+        # self.embedding = {k: e.to(device) for k, e in self.embedding.items()}
 
     def forward(self, batch):
         node_embed, graph_embed = super().forward(batch)

@@ -261,7 +261,7 @@ class TQDMCompose(Compose):
             else:
                 # data = [transform(d) for d in data]
                 t_data = []
-                for d in tqdm(data, leave=False):
+                for d in tqdm(data, desc=str(transform), leave=False):
                     t_data.append(transform(d))
                 data = t_data
                     # s_bar.update(1)
