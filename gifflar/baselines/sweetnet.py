@@ -2,7 +2,8 @@ from typing import Literal, Dict
 
 import torch
 from glycowork.ml.models import prep_model
-from torch_geometric.nn import global_mean_pool
+from torch import nn
+from torch_geometric.nn import global_mean_pool, GraphConv, Sequential
 import torch.nn.functional as F
 
 from gifflar.data import HeteroDataBatch
@@ -10,7 +11,7 @@ from gifflar.model import DownstreamGGIN
 
 
 class SweetNetLightning(DownstreamGGIN):
-    def __init__(self, hidden_dim: int, output_dim: int,
+    def __init__(self, hidden_dim: int, output_dim: int, num_layers: int,
                  task: Literal["classification", "regression", "multilabel"], **kwargs):
         """
         Embed the SweetNet Model into the pytorch-lightning framework.
@@ -26,7 +27,19 @@ class SweetNetLightning(DownstreamGGIN):
         del self.head
 
         # Load the untrained model from glycowork
-        self.model = prep_model("SweetNet", output_dim, hidden_dim=hidden_dim)
+        # self.model = prep_model("SweetNet", output_dim, hidden_dim=hidden_dim)
+        self.layers = Sequential('x, edge_index', [GraphConv(hidden_dim, hidden_dim) for _ in range(num_layers)])
+
+        self.head = nn.Sequential(
+            nn.Linear(hidden_dim, 1024),
+            nn.BatchNorm1d(1024),
+            nn.LeakyReLU(),
+            nn.Linear(1024, 128),
+            nn.BatchNorm1d(128),
+            nn.LeakyReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(64, output_dim),
+        )
 
     def forward(self, batch: HeteroDataBatch) -> Dict[str, torch.Tensor]:
         """
@@ -44,21 +57,25 @@ class SweetNetLightning(DownstreamGGIN):
         edge_index = batch["edge_index_dict"]["monosacchs", "boundary", "monosacchs"]
 
         # Getting node features
-        x = self.model.item_embedding(x)
-        x = x.squeeze(1)
-
+        # x = self.model.item_embedding(x)
+        # x = x.squeeze(1)
+        #
         # Graph convolution operations
-        x = F.leaky_relu(self.model.conv1(x, edge_index))
-        x = F.leaky_relu(self.model.conv2(x, edge_index))
-        node_embeds = F.leaky_relu(self.model.conv3(x, edge_index))
-        graph_embed = global_mean_pool(node_embeds, batch_ids)
-
+        # x = F.leaky_relu(self.model.conv1(x, edge_index))
+        # x = F.leaky_relu(self.model.conv2(x, edge_index))
+        # node_embeds = F.leaky_relu(self.model.conv3(x, edge_index))
+        # graph_embed = global_mean_pool(node_embeds, batch_ids)
+        #
         # Fully connected part
-        x = self.model.act1(self.model.bn1(self.model.lin1(graph_embed)))
-        x_out = self.model.bn2(self.model.lin2(x))
-        x = F.dropout(self.model.act2(x_out), p=0.5, training=self.model.training)
+        # x = self.model.act1(self.model.bn1(self.model.lin1(graph_embed)))
+        # x_out = self.model.bn2(self.model.lin2(x))
+        # x = F.dropout(self.model.act2(x_out), p=0.5, training=self.model.training)
+        #
+        # x = self.model.lin3(x)
 
-        x = self.model.lin3(x)
+        node_embeds = self.layers(x, edge_index)
+        graph_embed = global_mean_pool(node_embeds, batch_ids)
+        x = self.head(graph_embed)
 
         return {
             "node_embed": node_embeds,
