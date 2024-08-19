@@ -15,7 +15,7 @@ from sklearn.multioutput import MultiOutputRegressor, MultiOutputClassifier
 from sklearn.svm import LinearSVR, SVC, SVR
 from torchmetrics import MetricCollection, Accuracy, AUROC, MatthewsCorrCoef, MeanAbsoluteError, MeanSquaredError, \
     R2Score
-from gifflar.metrics import Sensitivity
+from gifflar.sensitivity import Sensitivity
 
 
 # MASK: +1 | Other: +2 => len(...) | len(...) + 1
@@ -116,7 +116,7 @@ def get_metrics(
             Accuracy(**metric_args),
             AUROC(**metric_args),
             MatthewsCorrCoef(**metric_args),
-            # Sensitivity(**metric_args),
+            Sensitivity(**metric_args),
         ])
     return {"train": m.clone(prefix="train/"), "val": m.clone(prefix="val/"), "test": m.clone(prefix="test/")}
 

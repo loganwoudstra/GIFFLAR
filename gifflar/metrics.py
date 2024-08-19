@@ -10,6 +10,8 @@ class Sensitivity(torchmetrics.Metric):
         self.add_state("false_negatives", default=torch.tensor(0), dist_reduce_fx="sum")
 
     def update(self, preds: torch.Tensor, target: torch.Tensor):
+        print(preds.shape)
+        print(target.shape)
         preds = (preds > self.threshold).int()
         target = target.int()
 
