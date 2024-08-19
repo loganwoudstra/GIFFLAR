@@ -2,10 +2,10 @@ import pickle
 
 from gifflar.data import GlycanStorage
 
-with open("collected.pkl", "rb") as f:
+with open("gifflar/acquisition/collected.pkl", "rb") as f:
     _, unique_glycans, _ = pickle.load(f)
 
-gs = GlycanStorage("C:/Users/joere/Desktop")
+gs = GlycanStorage("/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data")
 print("Loaded GlycanStorage:", len(gs.data))
 
 data = {}
