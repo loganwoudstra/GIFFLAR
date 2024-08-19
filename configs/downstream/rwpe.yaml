@@ -1,7 +1,7 @@
 seed: 42
 data_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/
 root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data
-logs_dir: logs_1024_10
+logs_dir: logs
 datasets:
   - name: Immunogenicity
     task: classification
@@ -24,13 +24,14 @@ datasets:
   - name: Taxonomy_Species
     task: multilabel
 pre-transforms:
+  RandomWalkPE:
+    dim: 20
 model:
   - name: gifflar
     hidden_dim: 1024
-    batch_size: 33
-    num_layers: 5
+    batch_size: 512
+    num_layers: 8
     epochs: 100
     learning_rate: 0.001
     optimizer: Adam
-    suffix: _1024_5
-
+    suffix: _rw

@@ -1,65 +1,66 @@
 seed: 42
 data_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/
 root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data
+logs_dir: logs
 datasets:
-  - name: Immunogenicity
-    task: classification
-  - name: Glycosylation
-    task: classification
+  #- name: Immunogenicity
+  #  task: classification
+  #- name: Glycosylation
+  #  task: classification
   - name: Taxonomy_Domain
     task: multilabel
-  - name: Taxonomy_Phylum
-    task: multilabel
-  - name: Taxonomy_Class
-    task: multilabel
-  - name: Taxonomy_Order
-    task: multilabel
-  - name: Taxonomy_Family
-    task: multilabel
-  - name: Taxonomy_Genus
-    task: multilabel
-  - name: Taxonomy_Species
-    task: multilabel
+  #- name: Taxonomy_Phylum
+  #  task: multilabel
+  #- name: Taxonomy_Class
+  #  task: multilabel
+  #- name: Taxonomy_Order
+  #  task: multilabel
+  #- name: Taxonomy_Family
+  #  task: multilabel
+  #- name: Taxonomy_Genus
+  #  task: multilabel
+  #- name: Taxonomy_Species
+  #  task: multilabel
 pre-transforms:
 model:
-  - name: rf
-    n_estimators: 500
-    n_jobs: -1
-    random_state: 42
-  - name: svm
-    random_state: 42
-  - name: xgb
-    random_state: 42
+  #- name: rf
+  #   n_estimators: 500
+  #  n_jobs: -1
+  #  random_state: 42
+  #- name: svm
+  #  random_state: 42
+  #- name: xgb
+  #  random_state: 42
   - name: mlp
     hidden_dim: 1024
     batch_size: 256
     num_layers: 3
-    epochs: 100
+    epochs: 1
     patience: 30
     learning_rate: 0
     optimizer: Adam
   - name: sweetnet
-    hidden_dim: 768
-    batch_size: 256
-    epochs: 50
+    hidden_dim: 1024
+    batch_size: 512
+    epochs: 1
     patience: 30
     learning_rate: 0.001
     optimizer: Adam
-    suffix: _768
+    suffix:
   - name: gnngly
-    hidden_dim: 14
-    batch_size: 256
+    hidden_dim: 1024
+    batch_size: 512
     num_layers: 5
-    epochs: 200
+    epochs: 1
     patience: 30
-    learning_rate: 0
-    optimizer: Adam
-    suffix: _5_14
-  - name: gifflar
-    hidden_dim: 768
-    batch_size: 32
-    num_layers: 6
-    epochs: 100
     learning_rate: 0.001
     optimizer: Adam
-    suffix: _768_6
+    suffix:
+  - name: gifflar
+    hidden_dim: 1024
+    batch_size: 512
+    num_layers: 8
+    epochs: 1
+    learning_rate: 0.001
+    optimizer: Adam
+    suffix:

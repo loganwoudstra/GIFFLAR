@@ -31,8 +31,8 @@ class GNNGLY(DownstreamGGIN):
         """
         super().__init__(14, output_dim, task)
 
-        del self.convs
-        del self.head
+        # del self.convs
+        # del self.head
 
         # Five layers of plain graph convolution with a hidden dimension of 14.
         self.layers = [
@@ -71,7 +71,7 @@ class GNNGLY(DownstreamGGIN):
             Dict holding the node embeddings, the graph embedding, and the final model prediction
         """
         # Extract atomic graph from the heterogeneous graph
-        x = batch["gnngly_x"]
+        x = batch["gnngly_x"].float()
         batch_ids = batch["gnngly_batch"]
         edge_index = batch["gnngly_edge_index"]
 
