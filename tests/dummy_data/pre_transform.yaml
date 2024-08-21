@@ -1,6 +1,7 @@
 seed: 42
 data_dir: ./
 root_dir: ./data
+logs_dir: ./logs
 datasets:
   - name: class-1
     label: class

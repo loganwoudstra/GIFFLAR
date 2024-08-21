@@ -1,6 +1,7 @@
 seed: 42
 data_dir: ./
 root_dir: ./data
+logs_dir: ./logs
 datasets:
   - name: class-1
     label: class
@@ -45,6 +46,7 @@ model:
   - name: sweetnet
     hidden_dim: 128
     batch_size: 256
+    num_layers: 3
     epochs: 5
     learning_rate: 0.001
     optimizer: Adam
