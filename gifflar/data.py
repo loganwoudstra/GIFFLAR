@@ -31,11 +31,21 @@ if sys.platform.startswith("win"):
 
 
 def clean_tree(tree):
+    """
+    Clean the tree from unnecessary node features and store only the IUPAC name.
+
+    Args:
+        tree: The tree to clean
+
+    Returns:
+        The cleaned tree
+    """
     for node in tree.nodes:
         attributes = copy.deepcopy(tree.nodes[node])
         if "type" in attributes and isinstance(attributes["type"], glyles.glycans.mono.monomer.Monomer):
             tree.nodes[node].clear()
-            tree.nodes[node].update({"iupac": "".join([x[0] for x in attributes["type"].recipe]), "name": attributes["type"].name})
+            tree.nodes[node].update({"iupac": "".join([x[0] for x in attributes["type"].recipe]),
+                                     "name": attributes["type"].name})
         else:
             return None
     return tree
@@ -72,14 +82,6 @@ def iupac2mol(iupac: str) -> Optional[HeteroData]:
     data["mol"] = mol
     data["tree"] = tree
     return data
-
-
-# iupac2mol()
-
-
-# GlyLES produces wrong structure?!, even wrong modifications?
-# print(iupac2mol("GlcA(b1-2)ManOAc"))
-# print(iupac2mol("GlcNAc(b1-3)LDManHep(a1-7)LDManHep(a1-3)[Glc(b1-4)]LDManHep(a1-5)[KoOPEtN(a2-4)]Kdo"))
 
 
 class HeteroDataBatch:
@@ -195,7 +197,7 @@ def hetero_collate(data: Optional[Union[List[List[HeteroData]], List[HeteroData]
         if len(tmp_edge_attr) != 0:
             edge_attr_dict[edge_type] = torch.cat(tmp_edge_attr, dim=0)
 
-    # For each baseline, collate it's node features and edge indices as well
+    # For each baseline, collate its node features and edge indices as well
     for b in baselines:
         kwargs[f"{b}_x"] = torch.cat([d[f"{b}_x"] for d in data], dim=0)
         edges = []
@@ -445,6 +447,7 @@ class PretrainGDs(GlycanDataset):
             root: str | Path,
             filename: str | Path,
             hash_code: str,
+            pre_transform: Optional[Callable] = None,
             **dataset_args
     ):
         """
@@ -459,7 +462,7 @@ class PretrainGDs(GlycanDataset):
             **dataset_args: Additional arguments to pass to the dataset
         """
         super().__init__(root=root, filename=filename, hash_code=hash_code,
-                         pre_transform=GIFFLARTransform(), **dataset_args)
+                         pre_transform=pre_transform, **dataset_args)
 
     @property
     def processed_file_names(self) -> Union[str, List[str], Tuple[str, ...]]:
@@ -541,13 +544,15 @@ class DownstreamGDs(GlycanDataset):
         # If the label is not given, use all columns except IUPAC and split
         if "label" not in self.dataset_args:
             self.dataset_args["label"] = [x for x in df.columns if x not in {"IUPAC", "split"}]
+
+        # Compute the number of classes
         if self.dataset_args["task"] != "classification":
             self.dataset_args["num_classes"] = len(self.dataset_args["label"])
         else:
             self.dataset_args["num_classes"] = int(max(df[self.dataset_args["label"]].values)) + 1
-        print(self.dataset_args["num_classes"])
         if self.dataset_args["num_classes"] == 2:
             self.dataset_args["num_classes"] = 1
+
         # Load the glycan storage to speed up the preprocessing
         gs = GlycanStorage(Path(self.root).parent)
         for index, (_, row) in tqdm(enumerate(df.iterrows())):
@@ -562,6 +567,7 @@ class DownstreamGDs(GlycanDataset):
                     d["y"] = d["y_oh"].argmax().item()
             d["ID"] = index
             data[row["split"]].append(d)
+
         gs.close()
         print("Processed", sum(len(v) for v in data.values()), "entries")
         for split in self.splits:

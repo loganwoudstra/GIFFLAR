@@ -1,17 +1,18 @@
-from typing import Dict
+from typing import Any
 
 import torch
 
+from gifflar.data import HeteroDataBatch
 from gifflar.model import DownstreamGGIN
 
 
 class MLP(DownstreamGGIN):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 
         del self.convs
 
-    def forward(self, batch) -> Dict[str, torch.Tensor]:
+    def forward(self, batch: HeteroDataBatch) -> dict[str, torch.Tensor]:
         """
         Make predictions based on the molecular fingerprint.
 

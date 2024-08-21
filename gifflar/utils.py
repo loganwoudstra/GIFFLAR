@@ -208,7 +208,17 @@ def nx2mol(G: nx.Graph, sanitize=True) -> rdkit.Chem.Mol:
     return mol
 
 
-def graph_removal(G, del_node_idx):
+def graph_removal(G: nx.Graph, del_node_idx: int) -> nx.Graph:
+    """
+    Remove a node from a graph and reindex the nodes and edges accordingly.
+
+    Args:
+        G: The graph to remove the node from
+        del_node_idx: The index of the node to remove
+
+    Returns:
+        The graph with the node removed and the indices reindexed
+    """
     H = nx.Graph()
     for node in G.nodes:
         if node < del_node_idx:
@@ -227,12 +237,19 @@ def graph_removal(G, del_node_idx):
     return H
 
 
-def connect_nx(atom, child_start, kids, me, original_atom):
+def connect_nx(atom: int, child_start: int, kids: nx.Graph, me: nx.Graph, original_atom: int) -> nx.Graph:
     """
-    atom: Name of the placeholder atom in me
-    child_start: Idx of the atom to connect to (the one to be replaced theoretically) in kids
-    kids: nx object of the children downstream the current connection
-    me: nx object of the monosaccharide to prepend
+    Connect a monosaccharide to a glycan.
+
+    Args:
+        atom: Name of the placeholder atom in me
+        child_start: Idx of the atom to connect to (the one to be replaced theoretically) in kids
+        kids: nx object of the children downstream the current connection
+        me: nx object of the monosaccharide to prepend
+        original_atom: The type of the original atom to be replaced in the monosaccharide
+
+    Returns:
+        The merged nx object
     """
     me_idx = [k for k, v in nx.get_node_attributes(me, "atomic_num").items() if v == atom][0]
     anchor_c = list(kids.neighbors(child_start))[0]
@@ -257,13 +274,24 @@ def connect_nx(atom, child_start, kids, me, original_atom):
 
 
 class S3NMerger(Merger):
-    def merge(self, t, root_orientation="n", start=100):
+    def merge(self, t, root_orientation: str = "n", start: int = 100) -> nx.Graph:
+        """
+        Merge a tree into a single molecule.
+
+        Args:
+            t: Tree representing the glycan to compute the whole SMILES representation for
+            root_orientation: The orientation of the root monomer
+            start: The starting index for the molecule
+
+        Returns:
+            The merged molecule
+        """
         # first mark the atoms that will be replaced in a binding of two monomers
         self.__mark(t, 0, f"({root_orientation}1-?)")
         # then merge the tree into a single molecule
         return self.__merge(t, 0, 0)
 
-    def __mark(self, t, node, p_edge):
+    def __mark(self, t: nx.Graph, node: int, p_edge: Optional[str] = None):
         """
         Recursively mark in every node of the molecule which atoms are being replaced by bound monomers.
 
@@ -295,7 +323,19 @@ class S3NMerger(Merger):
             t.nodes[node]["type"].mark(int(binding), *atom)
             self.__mark(t, child, t.get_edge_data(node, child)["type"])
 
-    def __merge(self, t, node, start, ring_index=None):
+    def __merge(self, t: nx.Graph, node: int, start: int, ring_index: Optional[int] = None):
+        """
+        Recursively merge a tree into a single molecule.
+
+        Args:
+            t: Tree representing the glycan to compute the whole SMILES representation for
+            node: ID of the node to work on in this method
+            start: The starting index for the molecule
+            ring_index: The index of the ring to close
+
+        Returns:
+            The merged molecule
+        """
         children = [x[1] for x in t.edges(node)]
         me = mol2nx(t.nodes[node]["type"].structure, node)
 

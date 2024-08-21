@@ -1,10 +1,11 @@
-from typing import Dict, Literal
+from typing import Dict, Literal, Any
 from collections import OrderedDict
 
 import torch
 from torch import nn
 from torch_geometric.nn import GCNConv, global_mean_pool
 
+from gifflar.data import HeteroDataBatch
 from gifflar.model import DownstreamGGIN
 
 """
@@ -27,9 +28,16 @@ class GNNGLY(DownstreamGGIN):
     """
 
     def __init__(self, hidden_dim: int, num_layers: int, output_dim: int,
-                 task: Literal["classification", "regression", "multilabel"], **kwargs):
+                 task: Literal["classification", "regression", "multilabel"], **kwargs: Any):
         """
         Initialize the model following the papers description.
+
+        Args:
+            hidden_dim: The dimension of the hidden layers
+            num_layers: The number of GCN layers
+            output_dim: The dimension of the output layer
+            task: The task to solve
+            kwargs: Additional arguments to pass to the model
         """
         super().__init__(hidden_dim, output_dim, task)
 
@@ -40,7 +48,7 @@ class GNNGLY(DownstreamGGIN):
         # ASSUMPTION: mean pooling
         self.pooling = global_mean_pool
 
-    def forward(self, batch):
+    def forward(self, batch: HeteroDataBatch) -> Dict[str, torch.Tensor]:
         """
         Forward the data though the model.
 

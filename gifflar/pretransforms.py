@@ -10,7 +10,6 @@ try:
 except ImportError:
     from rdkit.Chem import AllChem
     RDKIT_GEN = False
-from torch_geometric import transforms as T
 from torch_geometric.data import Data, HeteroData
 from torch_geometric.transforms import Compose, AddLaplacianEigenvectorPE
 from torch_geometric.transforms.base_transform import BaseTransform
@@ -20,7 +19,16 @@ from tqdm import tqdm
 from gifflar.utils import bond_map, lib_map, atom_map
 
 
-def split_hetero_graph(data):
+def split_hetero_graph(data: HeteroData) -> tuple[Data, Data, Data]:
+    """
+    Split a heterogeneous graph into homogeneous graphs.
+
+    Args:
+        data: The heterogeneous graph.
+
+    Returns:
+        A tuple of three homogeneous graphs, one for atoms, one for bonds, and one for monosaccharides.
+    """
     atoms_data = Data(
         edge_index=data["atoms", "coboundary", "atoms"]["edge_index"],
         num_nodes=data["atoms"]["num_nodes"],
@@ -37,6 +45,9 @@ def split_hetero_graph(data):
 
 
 def hetero_to_homo(data):
+    """
+    Convert a heterogeneous graph to a homogeneous by collapsing the node types and removing all node features
+    """
     bond_edge_index = data["bonds", "boundary", "bonds"]["edge_index"] + data["atoms"]["num_nodes"]
     monosacchs_edge_index = data["bonds", "boundary", "bonds"]["edge_index"] + data["atoms"]["num_nodes"] + \
                             data["bonds"]["num_nodes"]
@@ -50,20 +61,37 @@ def hetero_to_homo(data):
 
 
 class RootTransform(BaseTransform):
+    """Root transformation class."""
     def __init__(self, **kwargs):
         pass
 
 
 class GIFFLARTransform(RootTransform):
-    def __call__(self, data):
+    """Transformation to bring data into a GIFFLAR format"""
+    def __call__(self, data: HeteroData) -> HeteroData:
+        """
+        Transform the data into a GIFFLAR format. This means to compute the simplex network and create a heterogenous
+        graph from it.
+
+        Args:
+            data: The input data.
+
+        Returns:
+            The transformed data.
+        """
+        # Set up the atom information
         data["atoms"].x = torch.tensor([
             atom_map.get(atom.GetAtomicNum(), len(atom_map)) for atom in data["mol"].GetAtoms()
         ])
         data["atoms"].num_nodes = len(data["atoms"].x)
+
+        # prepare all data that can be extracted from one iteration over all bonds
         data["bonds"].x = []
         data["atoms", "coboundary", "atoms"].edge_index = []
         data["atoms", "to", "bonds"].edge_index = []
         data["bonds", "to", "monosacchs"].edge_index = []
+
+        # fill all bond-related information
         for bond in data["mol"].GetBonds():
             data["bonds"].x.append(bond_map.get(bond.GetBondType(), 0))
             data["atoms", "coboundary", "atoms"].edge_index += [
@@ -77,6 +105,8 @@ class GIFFLARTransform(RootTransform):
             data["bonds", "to", "monosacchs"].edge_index.append(
                 (bond.GetIdx(), bond.GetIntProp("mono_id"))
             )
+
+        # transform the data into tensors
         data["bonds"].x = torch.tensor(data["bonds"].x)
         data["bonds"].num_nodes = len(data["bonds"].x)
         data["atoms", "coboundary", "atoms"].edge_index = torch.tensor(data["atoms", "coboundary", "atoms"].edge_index,
@@ -85,12 +115,16 @@ class GIFFLARTransform(RootTransform):
                                                                dtype=torch.long).T
         data["bonds", "to", "monosacchs"].edge_index = torch.tensor(data["bonds", "to", "monosacchs"].edge_index,
                                                                     dtype=torch.long).T
+
+        # compute both types of linkages between bonds
         data["bonds", "boundary", "bonds"].edge_index = torch.tensor(
             [(bond1.GetIdx(), bond2.GetIdx()) for atom in data["mol"].GetAtoms() for bond1 in atom.GetBonds()
              for bond2 in atom.GetBonds() if bond1.GetIdx() != bond2.GetIdx()], dtype=torch.long).T
         data["bonds", "coboundary", "bonds"].edge_index = torch.tensor(
             [(bond1, bond2) for ring in data["mol"].GetRingInfo().BondRings() for bond1 in ring for bond2 in ring if
              bond1 != bond2], dtype=torch.long).T
+
+        # Set up the monosaccharide information
         data["monosacchs"].x = torch.tensor([  # This does not make sense. The monomer-ids are categorical features
             lib_map.get(data["tree"].nodes[node]["name"], len(lib_map)) for node in data["tree"].nodes
         ])
@@ -100,11 +134,19 @@ class GIFFLARTransform(RootTransform):
             data["monosacchs", "boundary", "monosacchs"].edge_index += [(a, b), (b, a)]
         data["monosacchs", "boundary", "monosacchs"].edge_index = torch.tensor(
             data["monosacchs", "boundary", "monosacchs"].edge_index, dtype=torch.long).T
+
         return data
 
 
 class GNNGLYTransform(RootTransform):
-    def __init__(self, **kwargs):
+    """Transformation to bring data into a GNNGLY format"""
+    def __init__(self, **kwargs: Any):
+        """
+        Initialize the GNNGLY transformation by setting up the one-hot encoders.
+
+        Args:
+            kwargs: Additional arguments.
+        """
         super().__init__(**kwargs)
         self.atom_encoder = torch.eye(101)
         self.chiral_encoder = torch.eye(4)
@@ -113,7 +155,16 @@ class GNNGLYTransform(RootTransform):
         self.h_encoder = torch.eye(5)
         self.hybrid_encoder = torch.eye(5)
 
-    def __call__(self, data):
+    def __call__(self, data: HeteroData) -> HeteroData:
+        """
+        Transform the data into a GNNGLY format.
+
+        Args:
+            data: The input data to be transformed.
+
+        Returns:
+            The transformed data.
+        """
         data["gnngly_x"] = torch.stack([torch.concat([
             self.atom_encoder[min(atom.GetAtomicNum(), 100)],
             self.chiral_encoder[min(atom.GetChiralTag(), 3)],
@@ -128,12 +179,29 @@ class GNNGLYTransform(RootTransform):
 
 
 class ECFPTransform(RootTransform):
+    """Transformation to bring data into an ECFP format for MLP and SL model usage"""
     def __init__(self, **kwargs):
+        """
+        Initialize the ECFP transformation.
+
+        Args:
+            kwargs: Additional arguments.
+        """
         super().__init__(**kwargs)
         if RDKIT_GEN:
             self.ecfp = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=1024)
 
-    def __call__(self, data):
+    def __call__(self, data: HeteroData) -> HeteroData:
+        """
+        Transform the data into an ECFP format.
+
+        Args:
+            data: The input data to be transformed.
+
+        Returns:
+            The transformed data.
+        """
+        # Check if the RDKit fingerprint generator is available
         if RDKIT_GEN:
             data["fp"] = torch.tensor(self.ecfp.GetFingerprint(data["mol"]), dtype=torch.float).reshape(1, -1)
         else:
@@ -142,7 +210,7 @@ class ECFPTransform(RootTransform):
 
 
 class SweetNetTransform(RootTransform):
-    def __init__(self, glycan_lib=lib, **kwargs: Any):
+    def __init__(self, glycan_lib: list[str] = lib, **kwargs: Any):
         """
         Transformation to convert a glycan IUPAC string to a PyG Data object for the SweetNet model.
 
@@ -153,7 +221,16 @@ class SweetNetTransform(RootTransform):
         super().__init__(**kwargs)
         self.glycan_lib = glycan_lib
 
-    def __call__(self, data):
+    def __call__(self, data: HeteroData) -> HeteroData:
+        """
+        Transform the data into a SweetNet format.
+
+        Args:
+            data: The input data to be transformed.
+
+        Returns:
+            The transformed data.
+        """
         try:
             d = from_networkx(glycan_to_nxGraph(data["IUPAC"], self.glycan_lib))
         except:
@@ -178,8 +255,17 @@ class LaplacianPE(AddLaplacianEigenvectorPE):
         self.max_dim = dim
         self.individual = individual
 
-    def __call__(self, data):
-        if self.individual:
+    def __call__(self, data: HeteroData) -> HeteroData:
+        """
+        Compute the Laplacian eigenvectors for the input data.
+
+        Args:
+            data: The input data to be transformed.
+
+        Returns:
+            The transformed data.
+        """
+        if self.individual:  # compute the laplacian eigenvectors for each node type individually
             for d, name in zip(split_hetero_graph(data), ["atoms", "bonds", "monosacchs"]):
                 if d["num_nodes"] <= self.max_dim:
                     self.k = min(d["num_nodes"] - 1, self.max_dim)
@@ -193,7 +279,7 @@ class LaplacianPE(AddLaplacianEigenvectorPE):
                 else:
                     super(LaplacianPE, self).forward(d)
                 data[f"{name}_{self.attr_name}"] = d[self.attr_name]
-        else:
+        else:  # or for the whole graph
             d = hetero_to_homo(data)
             super(LaplacianPE, self).forward(d)
             data[f"atoms_{self.attr_name}"] = d[self.attr_name][:data["atoms"]["num_nodes"]]
@@ -220,6 +306,15 @@ class RandomWalkPE(RootTransform):
         self.cuda = cuda
 
     def forward(self, data: Data) -> Data:
+        """
+        Compute the random walk positional encodings for the input data.
+
+        Args:
+            data: The input data to be transformed.
+
+        Returns:
+            The transformed data.
+        """
         if data["num_nodes"] == 1:
             data[self.attr_name] = torch.zeros(1, 20)
             return data
@@ -235,12 +330,21 @@ class RandomWalkPE(RootTransform):
         data[self.attr_name] = pe
         return data
 
-    def __call__(self, data):
-        if self.individual:
+    def __call__(self, data: HeteroData) -> HeteroData:
+        """
+        Compute the random walk positional encodings for the input data.
+
+        Args:
+            data: The input data to be transformed.
+
+        Returns:
+            The transformed data.
+        """
+        if self.individual:  # compute the random walk positional encodings for each node type individually
             for d, name in zip(split_hetero_graph(data), ["atoms", "bonds", "monosacchs"]):
                 self.forward(d)
                 data[f"{name}_{self.attr_name}"] = d[self.attr_name]
-        else:
+        else:  # or for the whole graph
             d = hetero_to_homo(data)
             self.forward(d)
             data[f"atoms_{self.attr_name}"] = d[self.attr_name][:data["atoms"]["num_nodes"]]
@@ -250,34 +354,41 @@ class RandomWalkPE(RootTransform):
 
 
 class TQDMCompose(Compose):
-    def forward(self, data: Union[Data, HeteroData]):
-        # print(self.transforms)
-        # print(len(self.transforms))
-        # print(len(data))
-        # with tqdm(total=len(self.transforms), desc="Transforms") as t_bar:
+    """Add TQDM bars to the transformations calculated in this Compose object"""
+    def forward(self, data: list[Union[Data, HeteroData]]):
+        """
+        Apply transformation in order to the input data and keep TQDM bars for process tracking.
+
+        Args:
+            data: The data to be transformed
+
+        Returns:
+            The transformed data
+        """
         for transform in tqdm(self.transforms, desc=f"Transform"):
             if not isinstance(data, (list, tuple)):
                 data = transform(data)
             else:
-                # data = [transform(d) for d in data]
-                t_data = []
-                for d in tqdm(data, desc=str(transform), leave=False):
-                    t_data.append(transform(d))
-                data = t_data
-                    # s_bar.update(1)
-                # data = [transform(d) for d in tqdm(data, total=len(data), desc="Samples", leave=False)]
-                # t_bar.update(1)
+                data = [transform(d) for d in tqdm(data, desc=str(transform), leave=False)]
         return data
 
 
-def get_pretransforms(**pre_transform_args) -> [T.Compose]:
+def get_pretransforms(**pre_transform_args) -> TQDMCompose:
+    """
+    Calculate the list of pre-transforms to be applied to the data.
+
+    Args:
+        pre_transform_args: The arguments for the pre-transforms.
+
+    Returns:
+        A TQDMCompose object containing the pre-transforms.
+    """
     pre_transforms = [
         GIFFLARTransform(**pre_transform_args.get("GIFFLARTransform", {})),
         GNNGLYTransform(**pre_transform_args.get("GNNGLYTransform", {})),
         ECFPTransform(**pre_transform_args.get("ECFPTransform", {})),
         SweetNetTransform(**pre_transform_args.get("SweetNetTransform", {})),
     ]
-    print(pre_transform_args)
     for name, args in pre_transform_args.items():
         if name == "LaplacianPE":
             pre_transforms.append(LaplacianPE(**args))

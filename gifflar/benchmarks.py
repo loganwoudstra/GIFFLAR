@@ -7,12 +7,17 @@ import pandas as pd
 from glycowork.glycan_data.loader import df_species as taxonomy
 from glyles import convert
 from tqdm import tqdm
-# from datasail.sail import datasail
 
 
 def iupac2smiles(iupac: str) -> Optional[str]:
     """
-    Convert IUPAC-condensed representations to SMILES strings (or None if the smiles string cannot be valid.
+    Convert IUPAC-condensed representations to SMILES strings (or None if the smiles string cannot be valid).
+
+    Args:
+        iupac: The IUPAC-condensed representation of the glycan.
+
+    Returns:
+        The SMILES string representation of the glycan.
     """
     if any([x in iupac for x in ["?", "{", "}"]]):
         return None
@@ -28,6 +33,9 @@ def iupac2smiles(iupac: str) -> Optional[str]:
 def get_taxonomy() -> pd.DataFrame:
     """
     Download full taxonomy data, process it, and save it as a tsv file.
+
+    Returns:
+        The processed taxonomy data.
     """
     if not (p := Path("taxonomy.tsv")).exists():
         mask = []
@@ -45,6 +53,9 @@ def get_taxonomic_level(
 ) -> Path:
     """
     Extract taxonomy data at a specific level, process it, and save it as a tsv file.
+
+    Args:
+        level: The taxonomic level to extract the data from.
 
     Returns:
         Path to the TSV file storing the processed dataset.
@@ -64,26 +75,6 @@ def get_taxonomic_level(
         classes = [x for x in tax.columns if x != "IUPAC"]
         tax[classes] = tax[classes].applymap(lambda x: min(1, x))
 
-        # Remove all columns with less than 5 members. 3 would also work, but that has potentially not valid split
-        # tax.drop(np.array(classes)[tax[classes].sum() < 5], axis="columns", inplace=True)
-        # classes = [x for x in tax.columns if x != "IUPAC"]
-        # remove all glycans that are not part of any class in the columns
-        # tax = tax[tax[classes].sum(axis=1) > 0]
-        # print(tax.shape)
-
-        # Apply a random split
-        # strats = dict(zip(tax["IUPAC"], tax[classes].apply(lambda row: "".join([str(row[c]) for c in classes]), axis=1)))
-        # e_split, _, _ = datasail(
-        #     techniques=["I1e"],
-        #     splits=[7, 2, 1],
-        #     names=["train", "val", "test"],
-        #     e_type="O",
-        #     e_data=dict(zip(tax["IUPAC"], tax["IUPAC"])),
-        #     e_strat=strats,
-        #     delta=0.3,
-        # )
-        # tax["split"] = tax["IUPAC"].map(e_split["I1e"][0])
-        print(tax.shape)
         tax["split"] = np.random.choice(["train", "val", "test"], tax.shape[0], p=[0.7, 0.2, 0.1])
         mask = ((tax[tax["split"] == "train"][classes].sum() == 0) |
                 (tax[tax["split"] == "val"][classes].sum() == 0) |
@@ -91,8 +82,6 @@ def get_taxonomic_level(
         tax.drop(columns=np.array(classes)[mask], inplace=True)
         classes = [x for x in tax.columns if x not in {"IUPAC", "split"}]
         tax = tax[tax[classes].sum(axis=1) > 0]
-        print(tax.shape)
-        # tax.drop(level, axis=1, inplace=True)
         tax.to_csv(p, sep="\t", index=False)
     return p
 
@@ -100,11 +89,6 @@ def get_taxonomic_level(
 def get_immunogenicity() -> Path:
     """
     Download immunogenicity data, process it, and save it as a tsv file.
-
-    Config:
-        - name: Immunogenicity
-          task: class-1
-          label: label
 
     Returns:
         The filepath of the processed immunogenicity data.
@@ -138,11 +122,6 @@ def get_glycosylation():
     """
     Download glycosylation data, process it, and save it as a tsv file.
 
-    Config:
-        - name: Glycosylation
-          task: class-1
-          label: label
-
     Returns:
         The filepath of the processed glycosylation data.
     """
@@ -168,6 +147,15 @@ def get_glycosylation():
 
 
 def get_dataset(data_config) -> Dict:
+    """
+    Get the dataset based on the configuration.
+
+    Args:
+        data_config: The configuration of the dataset.
+
+    Returns:
+        The configuration of the dataset with the filepath added and made sure the dataset is preprocessed
+    """
     name_fracs = data_config["name"].split("_")
     match name_fracs[0]:
         case "Taxonomy":
@@ -183,14 +171,5 @@ def get_dataset(data_config) -> Dict:
             path = root / f"{name_fracs[0].replace('-', '_')}.csv"
         case _:  # Unknown dataset
             raise ValueError(f"Unknown dataset {data_config['name']}.")
-    # if "label" in data_config:
-    #     if data_config["task"] in {"regression", "multilabel"}:
-    #         data_config["num_classes"] = len(data_config["label"])
-    #     else:
-    #         data_config["num_classes"] = int(pd.read_csv(
-    #             path, sep="\t" if path.suffix.lower().endswith(".tsv") else ","
-    #         )[data_config["label"]].values.max() + 1)
-    #         if data_config["num_classes"] == 2:
-    #             data_config["num_classes"] = 1
     data_config["filepath"] = path
     return data_config

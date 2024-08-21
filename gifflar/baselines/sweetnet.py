@@ -1,11 +1,9 @@
-from typing import Literal, Dict
+from typing import Literal, Any
 from collections import OrderedDict
 
 import torch
-from glycowork.ml.models import prep_model
 from torch import nn
-from torch_geometric.nn import global_mean_pool, GraphConv, Sequential
-import torch.nn.functional as F
+from torch_geometric.nn import global_mean_pool, GraphConv
 from glycowork.glycan_data.loader import lib
 
 from gifflar.data import HeteroDataBatch
@@ -14,14 +12,16 @@ from gifflar.model import DownstreamGGIN
 
 class SweetNetLightning(DownstreamGGIN):
     def __init__(self, hidden_dim: int, output_dim: int, num_layers: int,
-                 task: Literal["classification", "regression", "multilabel"], **kwargs):
+                 task: Literal["classification", "regression", "multilabel"], **kwargs: Any):
         """
         Embed the SweetNet Model into the pytorch-lightning framework.
 
         Args:
             hidden_dim: Number of hidden dimensions to use in model.
             output_dim: Number of outputs to produce, usually number of classes/labels/tasks.
+            num_layers: Number of graph convolutional layers to use in the model.
             task: What kind of dataset the model is trained on, necessary to select the metrics.
+            **kwargs: Additional arguments to pass to the model.
         """
         super().__init__(hidden_dim, output_dim, task)
 
@@ -43,7 +43,7 @@ class SweetNetLightning(DownstreamGGIN):
             nn.Linear(128, output_dim),
         )
     
-    def forward(self, batch: HeteroDataBatch) -> Dict[str, torch.Tensor]:
+    def forward(self, batch: HeteroDataBatch) -> dict[str, torch.Tensor]:
         """
         Forward the data though the model.
 
