@@ -124,7 +124,10 @@ class GlycanGIN(LightningModule):
             batch.x_dict[key] = torch.concat(pes, dim=1)
 
         for conv in self.convs:
-            batch.x_dict = conv(batch.x_dict, batch.edge_index_dict)
+            if isinstance(conv, HeteroConv):
+                batch.x_dict = conv(batch.x_dict, batch.edge_index_dict)
+            else:  # the layer is an activation function from the RGCN
+                batch.x_dict = conv(batch.x_dict)
 
         return batch.x_dict, self.pooling(
             torch.concat([batch.x_dict["atoms"], batch.x_dict["bonds"], batch.x_dict["monosacchs"]], dim=0),
