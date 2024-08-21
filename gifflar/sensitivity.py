@@ -8,20 +8,26 @@ from torchmetrics.utilities.enums import ClassificationTask
 
 
 class BinarySensitivity(BinaryConfusionMatrix):
+    """Computes sensitivity for binary classification tasks."""
     def compute(self) -> Tensor:
-        self.confmat = super().compute()
+        """Computes the sensitivity."""
+        self.confmat = super().compute().nan_to_num(0, 0, 0)
         return self.confmat[1, 1] / (self.confmat[1, 1] + self.confmat[1, 0])
 
 
 class MulticlassSensitivity(MulticlassConfusionMatrix):
+    """Computes sensitivity for multiclass classification tasks."""
     def compute(self) -> Tensor:
-        self.confmat = super().compute()
+        """Computes the sensitivity as mean per-class sensitivity."""
+        self.confmat = super().compute().nan_to_num(0, 0, 0)
         return (self.confmat.diag() / self.confmat.sum(dim=1)).mean()
 
 
 class MultilabelSensitivity(MultilabelConfusionMatrix):
+    """Computes sensitivity for multilabel classification tasks."""
     def compute(self) -> Tensor:
-        self.confmat = super().compute()
+        """Computes the sensitivity as mean per-class sensitivity"""
+        self.confmat = super().compute().nan_to_num(0, 0, 0)
         return (self.confmat[:, 1, 1] / self.confmat[:, 1, :].sum(dim=1)).mean()
 
 
@@ -37,7 +43,23 @@ class Sensitivity(_ClassificationTaskWrapper):
         validate_args: bool = True,
         **kwargs: Any,
     ) -> Metric:
-        """Initialize task metric."""
+        """
+        Factory method to instantiate the appropriate sensitivity metric based on the task.
+
+        Args:
+            task: The classification task type.
+            threshold: The threshold value for binary and multilabel classification tasks.
+            num_classes: The number of classes for multiclass classification tasks.
+            num_labels: The number of labels for multilabel classification tasks.
+            normalize: Normalization mode for confusion matrix.
+            ignore_index: The label index to ignore.
+            validate_args: Whether to validate input args.
+            **kwargs: Additional keyword arguments to pass to the metric.
+
+        Returns:
+            The sensitivity metric for the specified task.
+        """
+        # Initialize task metric
         task = ClassificationTask.from_str(task)
         kwargs.update({"normalize": normalize, "ignore_index": ignore_index, "validate_args": validate_args})
         if task == ClassificationTask.BINARY:
