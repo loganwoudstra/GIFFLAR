@@ -4,7 +4,7 @@ import sys
 import pandas as pd
 import yaml
 
-for metric in ["Accuracy", "MatthewsCorrCoef", "AUROC"]:
+for metric in ["Accuracy", "MatthewsCorrCoef", "AUROC", "Sensitivity"]:
     root = Path(sys.argv[1])
     models = [str(x).split("/")[-1] for x in root.iterdir() if x.is_dir()]  # ["rf", "svm", "xgb", "mlp", "gnngly", "sweetnet", "gifflar"]
     print(models)
