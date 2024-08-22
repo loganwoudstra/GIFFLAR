@@ -37,10 +37,11 @@ class RGCN(DownstreamGGIN):
         super(RGCN, self).__init__(hidden_dim, output_dim, task, num_layers, batch_size, pre_transform_args, **kwargs)
 
         self.convs = torch.nn.ModuleList()
-        for _ in range(num_layers):
+        dims = [kwargs["feat_dim"], hidden_dim // 2] + [hidden_dim] * (num_layers - 1)
+        for i in range(num_layers):
             self.convs.append(HeteroConv({
                 # Set the inner layers to be a single weight without using the nodes embedding (therefore, e=-1)
-                key: GINConv(nn.Sequential(nn.Linear(hidden_dim, hidden_dim)), eps=-1) for key in [
+                key: GINConv(nn.Sequential(nn.Linear(dims[i], dims[i + 1])), eps=-1) for key in [
                     ("atoms", "coboundary", "atoms"),
                     ("atoms", "to", "bonds"),
                     ("bonds", "to", "monosacchs"),

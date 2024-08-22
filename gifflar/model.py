@@ -167,7 +167,7 @@ class DownstreamGGIN(GlycanGIN):
             pre_transform_args: A dictionary of pre-transforms to apply to the input data
             kwargs: Additional arguments
         """
-        super().__init__(hidden_dim, num_layers, task, pre_transform_args)
+        super().__init__(kwargs["feat_dim"], hidden_dim, num_layers, task, pre_transform_args)
         self.output_dim = output_dim
 
         # Define the classification head of the model
