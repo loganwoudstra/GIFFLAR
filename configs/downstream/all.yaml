@@ -1,22 +1,22 @@
 seed: 42
 data_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/
 root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data
-logs_dir: logs
+logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs
 datasets:
-  - name: Immunogenicity
-    task: classification
-  - name: Glycosylation
-    task: classification
-  - name: Taxonomy_Domain
-    task: multilabel
-  - name: Taxonomy_Kingdom
-    task: multilabel
-  - name: Taxonomy_Phylum
-    task: multilabel
-  - name: Taxonomy_Class
-    task: multilabel
-  - name: Taxonomy_Order
-    task: multilabel
+  #- name: Immunogenicity
+  #  task: classification
+  #- name: Glycosylation
+  #  task: classification
+  #- name: Taxonomy_Domain
+  #  task: multilabel
+  #- name: Taxonomy_Kingdom
+  #  task: multilabel
+  #- name: Taxonomy_Phylum
+  #  task: multilabel
+  #- name: Taxonomy_Class
+  #  task: multilabel
+  #- name: Taxonomy_Order
+  #  task: multilabel
   - name: Taxonomy_Family
     task: multilabel
   - name: Taxonomy_Genus
