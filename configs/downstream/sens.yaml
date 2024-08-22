@@ -1,0 +1,77 @@
+seed: 42
+data_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/
+root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data
+logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs
+datasets:
+  # - name: Immunogenicity
+  #  task: classification
+  #- name: Glycosylation
+  #  task: classification
+  #- name: Taxonomy_Domain
+  #  task: multilabel
+  #- name: Taxonomy_Kingdom
+  #  task: multilabel
+  #- name: Taxonomy_Phylum
+  #  task: multilabel
+  #- name: Taxonomy_Class
+  #  task: multilabel
+  #- name: Taxonomy_Order
+  #  task: multilabel
+  #- name: Taxonomy_Family
+  #  task: multilabel
+  - name: Taxonomy_Genus
+    task: multilabel
+  - name: Taxonomy_Species
+    task: multilabel
+pre-transforms:
+model:
+  - name: rf
+    n_estimators: 500
+    n_jobs: -1
+    random_state: 42
+  - name: svm
+    random_state: 42
+  - name: xgb
+    random_state: 42
+  - name: mlp
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 3
+    epochs: 100
+    patience: 30
+    learning_rate: 0
+    optimizer: Adam
+  - name: sweetnet
+    hidden_dim: 1024
+    batch_size: 512
+    num_layers: 16
+    epochs: 100
+    patience: 30
+    learning_rate: 0.001
+    optimizer: Adam
+    suffix:
+  - name: gnngly
+    hidden_dim: 1024
+    batch_size: 512
+    num_layers: 8
+    epochs: 100
+    patience: 30
+    learning_rate: 0.001
+    optimizer: Adam
+    suffix:
+  #- name: rgcn
+  #  hidden_dim: 1024
+  #  batch_size: 256
+  #  num_layers: 8
+  #  epochs: 100
+  #  learning_rate: 0.001
+  #  optimizer: Adam
+  #  suffix:
+  - name: gifflar
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 8
+    epochs: 100
+    learning_rate: 0.001
+    optimizer: Adam
+    suffix:
