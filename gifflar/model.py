@@ -17,13 +17,23 @@ def dict_embeddings(dim: int, keys: List[object]):
     return lambda x: emb[mapping.get(x, len(keys))]
 
 
-def get_gin_layer(hidden_dim: int):
+def get_gin_layer(input_dim: int, output_dim: int) -> GINConv:
+    """
+    Get a GIN layer with the specified input and output dimensions
+
+    Args:
+        input_dim: The input dimension of the GIN layer
+        output_dim: The output dimension of the GIN layer
+
+    Returns:
+        A GIN layer with the specified input and output dimensions
+    """
     return GINConv(
         nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(input_dim, output_dim),
             nn.PReLU(),
             nn.Dropout(0.2),
-            nn.BatchNorm1d(hidden_dim),
+            nn.BatchNorm1d(output_dim),
         )
     )
 
@@ -59,12 +69,14 @@ class MultiEmbedding(nn.Module):
 
 
 class GlycanGIN(LightningModule):
-    def __init__(self, hidden_dim: int, num_layers: int, task: Literal["regression", "classification", "multilabel"],
+    def __init__(self, feat_dim: int, hidden_dim: int, num_layers: int,
+                 task: Literal["regression", "classification", "multilabel"],
                  pre_transform_args: Optional[Dict] = None):
         """
         Initialize the GlycanGIN model, the base for all DL-models in this package
 
         Args:
+            feat_dim: The feature dimension of the model
             hidden_dim: The hidden dimension of the model
             num_layers: The number of GIN layers to use
             task: The task to perform, either "regression", "classification" or "multilabel"
@@ -73,7 +85,7 @@ class GlycanGIN(LightningModule):
         super().__init__()
 
         # Preparation for additional information in the embeddings of the nodes
-        rand_dim = hidden_dim
+        rand_dim = feat_dim
         self.addendum = []
         if pre_transform_args is not None:
             for name, args in pre_transform_args.items():
@@ -89,9 +101,10 @@ class GlycanGIN(LightningModule):
 
         # Define the GIN layers to embed messages between nodes
         self.convs = torch.nn.ModuleList()
-        for _ in range(num_layers):
+        dims = [feat_dim, hidden_dim // 2] + [hidden_dim] * (num_layers - 1)
+        for i in range(num_layers):
             self.convs.append(HeteroConv({
-                key: get_gin_layer(hidden_dim) for key in [
+                key: get_gin_layer(dims[i], dims[i + 1]) for key in [
                     ("atoms", "coboundary", "atoms"),
                     ("atoms", "to", "bonds"),
                     ("bonds", "to", "monosacchs"),

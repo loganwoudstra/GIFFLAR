@@ -81,7 +81,7 @@ class GIFFLARTransform(RootTransform):
         """
         # Set up the atom information
         data["atoms"].x = torch.tensor([
-            atom_map.get(atom.GetAtomicNum(), len(atom_map)) for atom in data["mol"].GetAtoms()
+            atom_map.get(atom.GetAtomicNum(), 1) for atom in data["mol"].GetAtoms()
         ])
         data["atoms"].num_nodes = len(data["atoms"].x)
 
@@ -93,7 +93,7 @@ class GIFFLARTransform(RootTransform):
 
         # fill all bond-related information
         for bond in data["mol"].GetBonds():
-            data["bonds"].x.append(bond_map.get(bond.GetBondType(), 0))
+            data["bonds"].x.append(bond_map.get(bond.GetBondDir(), 1))
             data["atoms", "coboundary", "atoms"].edge_index += [
                 (bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()),
                 (bond.GetEndAtomIdx(), bond.GetBeginAtomIdx())
@@ -126,7 +126,7 @@ class GIFFLARTransform(RootTransform):
 
         # Set up the monosaccharide information
         data["monosacchs"].x = torch.tensor([  # This does not make sense. The monomer-ids are categorical features
-            lib_map.get(data["tree"].nodes[node]["name"], len(lib_map)) for node in data["tree"].nodes
+            lib_map.get(data["tree"].nodes[node]["name"], 1) for node in data["tree"].nodes
         ])
         data["monosacchs"].num_nodes = len(data["monosacchs"].x)
         data["monosacchs", "boundary", "monosacchs"].edge_index = []

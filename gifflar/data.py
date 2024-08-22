@@ -296,7 +296,7 @@ class GlycanDataModule(LightningDataModule):
             DataLoader for the training data
         """
         return DataLoader(self.train, batch_size=min(self.batch_size, len(self.train)), shuffle=True ,
-                          collate_fn=hetero_collate)
+                          collate_fn=hetero_collate, num_workers=16)
 
     def val_dataloader(self) -> DataLoader:
         """
@@ -306,7 +306,7 @@ class GlycanDataModule(LightningDataModule):
             DataLoader for the validation data
         """
         return DataLoader(self.val, batch_size=min(self.batch_size, len(self.val)), shuffle=False,
-                          collate_fn=hetero_collate)
+                          collate_fn=hetero_collate, num_workers=16)
 
     def test_dataloader(self) -> DataLoader:
         """
@@ -316,7 +316,7 @@ class GlycanDataModule(LightningDataModule):
             DataLoader for the test data
         """
         return DataLoader(self.test, batch_size=min(self.batch_size, len(self.test)), shuffle=False,
-                          collate_fn=hetero_collate)
+                          collate_fn=hetero_collate, num_workers=16)
 
 
 class PretrainGDM(GlycanDataModule):

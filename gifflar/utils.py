@@ -18,13 +18,11 @@ from torchmetrics import MetricCollection, Accuracy, AUROC, MatthewsCorrCoef, Me
 from gifflar.sensitivity import Sensitivity
 
 
-# MASK: +1 | Other: +2 => len(...) | len(...) + 1
-atom_map = {6: 0, 7: 1, 8: 2, 15: 3, 16: 4}
-bond_map = {Chem.BondType.SINGLE: 0, Chem.BondType.AROMATIC: 1, Chem.BondType.DOUBLE: 2, Chem.BondType.TRIPLE: 3}
-lib_map = {n: i for i, n in enumerate(lib)}
-chiral_map = {n: i for i, n in enumerate([
-    Chem.BondDir.BEGINDASH, Chem.BondDir.BEGINWEDGE, Chem.BondDir.NONE
-])}
+# MASK, unknown, values...
+atom_map = {6: 2, 7: 3, 8: 4, 15: 5, 16: 6}
+# bond_map = {Chem.BondType.SINGLE: 0, Chem.BondType.AROMATIC: 1, Chem.BondType.DOUBLE: 2, Chem.BondType.TRIPLE: 3}
+bond_map = {Chem.BondDir.BEGINDASH: 2, Chem.BondDir.BEGINWEDGE: 3, Chem.BondDir.NONE: 4}
+lib_map = {n: i + 2 for i, n in enumerate(lib)}
 
 
 def get_sl_model(
