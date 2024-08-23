@@ -1,0 +1,18 @@
+seed: 42
+file_path: pretrain.txt
+logs_dir: logs_pret
+pre-transforms:
+transforms:
+  TypeMasking:
+    cell: atoms
+    prob: 0.15
+model:
+  name: GIFFLAR
+  feat_dim: 16
+  hidden_dim: 64
+  batch_size: 4
+  num_layers: 3
+  epochs: 10
+  learning_rate: 0.001
+  optimizer: Adam
+  suffix:

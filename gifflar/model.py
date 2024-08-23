@@ -1,4 +1,4 @@
-from typing import List, Literal, Dict, Optional
+from typing import List, Literal, Dict, Optional, Any
 
 from glycowork.glycan_data.loader import lib
 from pytorch_lightning import LightningModule
@@ -38,6 +38,25 @@ def get_gin_layer(input_dim: int, output_dim: int) -> GINConv:
     )
 
 
+def get_prediction_head(input_dim: int, num_predictions: int,
+                        task: Literal["regression", "classification", "multilabel"]):
+    head = nn.Sequential(
+        nn.Linear(input_dim, input_dim // 2),
+        nn.PReLU(),
+        nn.Dropout(0.2),
+        nn.Linear(input_dim // 2, num_predictions)
+    )
+    if task == "regression":
+        loss = nn.MSELoss()
+    elif num_predictions == 1 or task == "multilabel":
+        loss = nn.BCEWithLogitsLoss()
+    else:
+        loss = nn.CrossEntropyLoss()
+
+    metrics = get_metrics(task, num_predictions)
+    return head, loss, metrics
+
+
 pre_transforms = {
     "LaplacianPE": LaplacianPE,
     "RandomWalkPE": RandomWalkPE,
@@ -46,6 +65,7 @@ pre_transforms = {
 
 class MultiEmbedding(nn.Module):
     """Class storing multiple embeddings in a dict-format and allowing for training them as nn.Module"""
+
     def __init__(self, embeddings: dict[str, nn.Embedding]):
         """
         Initialize the MultiEmbedding class
@@ -69,8 +89,7 @@ class MultiEmbedding(nn.Module):
 
 
 class GlycanGIN(LightningModule):
-    def __init__(self, feat_dim: int, hidden_dim: int, num_layers: int,
-                 task: Literal["regression", "classification", "multilabel"],
+    def __init__(self, feat_dim: int, hidden_dim: int, num_layers: int, batch_size: int = 32,
                  pre_transform_args: Optional[Dict] = None):
         """
         Initialize the GlycanGIN model, the base for all DL-models in this package
@@ -79,7 +98,6 @@ class GlycanGIN(LightningModule):
             feat_dim: The feature dimension of the model
             hidden_dim: The hidden dimension of the model
             num_layers: The number of GIN layers to use
-            task: The task to perform, either "regression", "classification" or "multilabel"
             pre_transform_args: A dictionary of pre-transforms to apply to the input data
         """
         super().__init__()
@@ -113,11 +131,9 @@ class GlycanGIN(LightningModule):
                 ]
             }))
 
-        self.pooling = global_mean_pool
+        self.batch_size = batch_size
 
-        self.task = task
-
-    def forward(self, batch: HeteroData) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, batch: HeteroData) -> torch.Tensor:
         """
         Forward pass of the model.
 
@@ -142,14 +158,105 @@ class GlycanGIN(LightningModule):
             else:  # the layer is an activation function from the RGCN
                 batch.x_dict = conv(batch.x_dict)
 
-        return batch.x_dict, self.pooling(
-            torch.concat([batch.x_dict["atoms"], batch.x_dict["bonds"], batch.x_dict["monosacchs"]], dim=0),
-            torch.concat([batch.batch_dict["atoms"], batch.batch_dict["bonds"], batch.batch_dict["monosacchs"]], dim=0)
-        )
+        return batch.x_dict
+
+    def shared_step(self, batch: HeteroData, stage: Literal["train", "val", "test"]) -> dict:
+        raise NotImplementedError()
+
+    def training_step(self, batch: HeteroData, batch_idx: int) -> dict:
+        """Compute the training step of the model"""
+        return self.shared_step(batch, "train")
+
+    def validation_step(self, batch: HeteroData, batch_idx: int) -> dict:
+        """Compute the validation step of the model"""
+        return self.shared_step(batch, "val")
+
+    def test_step(self, batch: HeteroData, batch_idx: int) -> dict:
+        """Compute the testing step of the model"""
+        return self.shared_step(batch, "test")
+
+    def shared_end(self, stage: Literal["train", "val", "test"]) -> None:
+        raise NotImplementedError()
+
+    def on_train_epoch_end(self) -> None:
+        """Compute the end of the training epoch"""
+        self.shared_end("train")
+
+    def on_validation_epoch_end(self) -> None:
+        """Compute the end of the validation"""
+        self.shared_end("val")
+
+    def on_test_epoch_end(self) -> None:
+        """Compute the end of the testing"""
+        self.shared_end("test")
+
+    def configure_optimizers(self):
+        """Configure the optimizer and the learning rate scheduler of the model"""
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5),
+            "monitor": "val/loss",
+        }
 
 
 class PretrainGGIN(GlycanGIN):
-    pass
+    def __init__(self, hidden_dim: int, tasks: list[dict[str, Any]], num_layers: int = 3, batch_size: int = 32,
+                 pre_transform_args: Optional[Dict] = None, **kwargs):
+        """
+        Initialize the PretrainGGIN model, a pre-training model for downstream tasks.
+
+        Args:
+            hidden_dim: The hidden dimension of the model
+            output_dim: The output dimension of the model
+            num_layers: The number of GIN layers to use
+            batch_size: The batch size to use
+            pre_transform_args: A dictionary of pre-transforms to apply to the input data
+            kwargs: Additional arguments
+        """
+        super().__init__(kwargs["feat_dim"], hidden_dim, num_layers, batch_size, pre_transform_args)
+        self.tasks = tasks
+
+        # Define the prediction heads of the model
+        # for t, task in enumerate(tasks):
+        #     model, loss, metrics = get_prediction_head(hidden_dim, task["num_classes"], task["task"])
+        self.atom_mask_head, self.atom_mask_loss, self.atom_mask_metrics \
+            = get_prediction_head(hidden_dim, len(atom_map) + 1, "classification")
+
+    def forward(self, batch: HeteroData) -> dict:
+        """
+        Forward pass of the model.
+
+        Args:
+            batch: The batch of data to process
+
+        Returns:
+            node_embed: The node embeddings
+        """
+        node_embeds = super().forward(batch)
+        atom_preds = self.atom_mask_head(node_embeds["atoms"])
+        return {
+            "node_embed": node_embeds,
+            "atom_preds": atom_preds,
+        }
+
+    def shared_step(self, batch: HeteroData, stage: Literal["train", "val", "test"]) -> dict:
+        fwd_dict = self.forward(batch)
+
+        fwd_dict["atom_loss"] = self.atom_mask_loss(fwd_dict["atom_preds"], batch["atoms_y"])
+        fwd_dict["loss"] = fwd_dict["atom_loss"]
+
+        self.atom_mask_metrics[stage].update(fwd_dict["atom_preds"], batch["atoms_y"])
+
+        self.log(f"{stage}/atom_loss", fwd_dict["atom_loss"], batch_size=self.batch_size)
+        self.log(f"{stage}/loss", fwd_dict["loss"], batch_size=self.batch_size)
+
+        return fwd_dict
+
+    def shared_end(self, stage: Literal["train", "val", "test"]) -> None:
+        metrics = self.atom_mask_metrics[stage].compute()
+        self.log_dict(metrics)
+        self.atom_mask_metrics[stage].reset()
 
 
 class DownstreamGGIN(GlycanGIN):
@@ -167,8 +274,11 @@ class DownstreamGGIN(GlycanGIN):
             pre_transform_args: A dictionary of pre-transforms to apply to the input data
             kwargs: Additional arguments
         """
-        super().__init__(kwargs["feat_dim"], hidden_dim, num_layers, task, pre_transform_args)
+        super().__init__(kwargs["feat_dim"], hidden_dim, num_layers, batch_size, pre_transform_args)
         self.output_dim = output_dim
+
+        self.pooling = global_mean_pool
+        self.task = task
 
         # Define the classification head of the model
         self.head = nn.Sequential(
@@ -180,10 +290,8 @@ class DownstreamGGIN(GlycanGIN):
         if self.task == "multilabel":
             self.sigmoid = nn.Sigmoid()
 
-        self.batch_size = batch_size
-
         # Define the loss function based on the task and the number of outputs to predict
-        if task == "regression":
+        if self.task == "regression":
             self.loss = nn.MSELoss()
         elif self.output_dim == 1:
             self.loss = nn.BCEWithLogitsLoss()
@@ -222,7 +330,11 @@ class DownstreamGGIN(GlycanGIN):
                 graph_embed: The graph embeddings
                 preds: The predictions of the model
         """
-        node_embed, graph_embed = super().forward(batch)
+        node_embed = super().forward(batch)
+        graph_embed = self.pooling(
+            torch.concat([node_embed["atoms"], node_embed["bonds"], node_embed["monosacchs"]], dim=0),
+            torch.concat([batch.batch_dict["atoms"], batch.batch_dict["bonds"], batch.batch_dict["monosacchs"]], dim=0)
+        )
         pred = self.head(graph_embed)
         return {
             "node_embed": node_embed,
@@ -274,18 +386,6 @@ class DownstreamGGIN(GlycanGIN):
         self.log(f"{stage}/loss", fwd_dict["loss"], batch_size=self.batch_size)
         return fwd_dict
 
-    def training_step(self, batch: HeteroData, batch_idx: int) -> dict:
-        """Compute the training step of the model"""
-        return self.shared_step(batch, "train")
-
-    def validation_step(self, batch: HeteroData, batch_idx: int) -> dict:
-        """Compute the validation step of the model"""
-        return self.shared_step(batch, "val")
-
-    def test_step(self, batch: HeteroData, batch_idx: int) -> dict:
-        """Compute the testing step of the model"""
-        return self.shared_step(batch, "test")
-
     def shared_end(self, stage: Literal["train", "val", "test"]) -> None:
         """
         Shared end for training, validation and testing steps.
@@ -296,24 +396,3 @@ class DownstreamGGIN(GlycanGIN):
         metrics = self.metrics[stage].compute()
         self.log_dict(metrics)
         self.metrics[stage].reset()
-
-    def on_train_epoch_end(self) -> None:
-        """Compute the end of the training epoch"""
-        self.shared_end("train")
-
-    def on_validation_epoch_end(self) -> None:
-        """Compute the end of the validation"""
-        self.shared_end("val")
-
-    def on_test_epoch_end(self) -> None:
-        """Compute the end of the testing"""
-        self.shared_end("test")
-
-    def configure_optimizers(self):
-        """Configure the optimizer and the learning rate scheduler of the model"""
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5),
-            "monitor": "val/loss",
-        }

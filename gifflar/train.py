@@ -16,10 +16,11 @@ from gifflar.baselines.gnngly import GNNGLY
 from gifflar.baselines.mlp import MLP
 from gifflar.baselines.rgcn import RGCN
 from gifflar.baselines.sweetnet import SweetNetLightning
-from gifflar.data import DownsteamGDM
+from gifflar.data import DownsteamGDM, PretrainGDM
 from gifflar.benchmarks import get_dataset
-from gifflar.model import DownstreamGGIN
+from gifflar.model import DownstreamGGIN, PretrainGGIN
 from gifflar.pretransforms import get_pretransforms
+from gifflar.transforms import get_transforms
 from gifflar.utils import get_sl_model, get_metrics
 
 MODELS = {
@@ -138,6 +139,36 @@ def train(**kwargs: Any) -> None:
     trainer.fit(model, datamodule)
 
 
+def pretrain(**kwargs: Any) -> None:
+    """
+    Pretrain a deep learning model.
+
+    Params:
+        kwargs: The configuration for the training.
+    """
+    transforms, task_list = get_transforms(**(kwargs.get("transforms", None) or {}))
+    datamodule = PretrainGDM(
+        file_path=kwargs["file_path"], hash_code=kwargs["hash"], batch_size=kwargs["model"].get("batch_size", 1),
+        transform=transforms, pre_transform=get_pretransforms(**(kwargs.get("pre-transforms", None) or {})),
+    )
+    model = PretrainGGIN(tasks=task_list, pre_transform_args=kwargs["pre-transforms"], **kwargs["model"])
+
+    # set up the logger
+    logger = CSVLogger(kwargs["logs_dir"], name=kwargs["model"]["name"] + (kwargs["model"].get("suffix", None) or "") + "_pretrain")
+    logger.log_hyperparams(kwargs)
+
+    trainer = Trainer(
+        callbacks=[
+            RichModelSummary(),
+            RichProgressBar(),
+        ],
+        max_epochs=kwargs["model"]["epochs"],
+        logger=logger,
+    )
+    print(transforms)
+    trainer.fit(model, datamodule)
+
+
 def read_yaml_config(filename: str | Path) -> dict:
     """Read in yaml config for training."""
     with open(filename, "r") as file:
@@ -213,15 +244,19 @@ def hash_dict(input_dict: dict, n_chars: int = 8) -> str:
 
 def main(config):
     custom_args = read_yaml_config(config)
-    for args in unfold_config(custom_args):
-        #try:
-        args["hash"] = hash_dict(args["pre-transforms"])
-        print(args)
-        if args["model"]["name"] in ["rf", "svm", "xgb"]:
-            fit(**args)
-        else:
-            train(**args)
-        print("Finished", args["model"]["name"], "on", args["dataset"]["name"])
+    custom_args["hash"] = hash_dict(custom_args["pre-transforms"])
+    if "data_dir" in custom_args:
+        for args in unfold_config(custom_args):
+            #try:
+            print(args)
+            if args["model"]["name"] in ["rf", "svm", "xgb"]:
+                fit(**args)
+            else:
+                train(**args)
+            print("Finished training", args["model"]["name"], "on", args["dataset"]["name"])
+    else:
+        pretrain(**custom_args)
+        print("Finished pretraining GIFFLAR on", custom_args["file_path"])
         #except Exception as e:
         #    print(args["model"]["name"], "failed on", args["dataset"]["name"], "with", f"\"{e}\"")
 

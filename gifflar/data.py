@@ -10,8 +10,8 @@ import pandas as pd
 import torch
 from rdkit import Chem, RDLogger
 from rdkit.Chem import rdDepictor
-from torch.utils.data import DataLoader
-from torch_geometric.data import InMemoryDataset, HeteroData
+from torch.utils.data import DataLoader  # has to be these, otherwise collate_fn does not work!
+from torch_geometric.data import InMemoryDataset, HeteroData, Dataset
 from pytorch_lightning import LightningDataModule
 import glyles
 from glyles.glycans.factory.factory import MonomerFactory
@@ -49,6 +49,7 @@ def clean_tree(tree):
         else:
             return None
     return tree
+
 
 def iupac2mol(iupac: str) -> Optional[HeteroData]:
     """
@@ -111,8 +112,6 @@ class HeteroDataBatch:
                 for key, value in v.items():
                     if hasattr(value, "to"):
                         v[key] = value.to(device)
-            # else:
-            #     raise ValueError(f"Attribute {k} cannot be converted to device {device}.")
         return self
 
     def __getitem__(self, item: str) -> Any:
@@ -322,11 +321,13 @@ class GlycanDataModule(LightningDataModule):
 class PretrainGDM(GlycanDataModule):
     """DataModule for pretraining a model on glycan data."""
     def __init__(
-            self, root: str | Path,
-            filename: str | Path,
+            self,
+            file_path: str | Path,
             hash_code: str,
             batch_size: int = 64,
             train_frac: float = 0.8,
+            transform: Optional[Callable] = None,
+            pre_transform: Optional[Callable] = None,
             **kwargs: Any,
     ):
         """
@@ -338,10 +339,15 @@ class PretrainGDM(GlycanDataModule):
             hash_code: The hash code to use for the processed data
             batch_size: The batch size to use for training, validation, and testing
             train_frac: The fraction of the data to use for training
+            transform: The transform to apply to the data
+            pre_transform: The pre-transform to apply to the data
             **kwargs: Additional arguments to pass to the Pretrain
         """
+        root = Path(file_path).parent
+        filename = Path(file_path).name
         super().__init__(batch_size)
-        ds = PretrainGDs(root=root, filename=filename, hash_code=hash_code, **kwargs)
+        ds = PretrainGDs(root=root, filename=filename, hash_code=hash_code, transform=transform,
+                         pre_transform=pre_transform, **kwargs)
         self.train, self.val = torch.utils.data.dataset.random_split(ds, [train_frac, 1 - train_frac])
 
 
@@ -355,7 +361,7 @@ class DownsteamGDM(GlycanDataModule):
             batch_size: int = 64,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
-            **dataset_args
+            **dataset_args,
     ):
         """
         Initialize the DataModule with the given parameters.
@@ -409,7 +415,7 @@ class GlycanDataset(InMemoryDataset):
         """
         self.filename = Path(filename)
         self.dataset_args = dataset_args
-        super().__init__(root=str(Path(root) / f"{filename.stem}_{hash_code}"), transform=transform,
+        super().__init__(root=str(Path(root) / f"{self.filename.stem}_{hash_code}"), transform=transform,
                          pre_transform=pre_transform)
         self.data, self.dataset_args = torch.load(self.processed_paths[path_idx])
 
@@ -423,7 +429,7 @@ class GlycanDataset(InMemoryDataset):
 
     def __getitem__(self, item) -> Any:
         """Return the item at the given index."""
-        return self.data[item]
+        return self.data[item] if self.transform is None else self.transform(self.data[item])
 
     @property
     def processed_paths(self) -> List[str]:
@@ -447,6 +453,7 @@ class PretrainGDs(GlycanDataset):
             root: str | Path,
             filename: str | Path,
             hash_code: str,
+            transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
             **dataset_args
     ):
@@ -461,7 +468,7 @@ class PretrainGDs(GlycanDataset):
             pre_transform: The pre-transform to apply to the data
             **dataset_args: Additional arguments to pass to the dataset
         """
-        super().__init__(root=root, filename=filename, hash_code=hash_code,
+        super().__init__(root=root, filename=filename, hash_code=hash_code, transform=transform,
                          pre_transform=pre_transform, **dataset_args)
 
     @property
@@ -473,11 +480,12 @@ class PretrainGDs(GlycanDataset):
         """Process the data and store it."""
         data = []
         gs = GlycanStorage(Path(self.root).parent)
-        df = pd.read_csv(self.filename, sep="\t" if self.filename.suffix.lower().endswith(".tsv") else ",")
-        for index, (_, row) in tqdm(enumerate(df.iterrows())):
-            d = gs.query(row["IUPAC"])
-            d["ID"] = index
-            data.append(d)
+        # df = pd.read_csv(self.filename, sep="\t" if self.filename.suffix.lower().endswith(".tsv") else ",")
+        with open(self.filename, "r") as glycans:
+            for line in glycans.readlines():
+                d = gs.query(line.strip())
+                # d["ID"] = index
+                data.append(d)
         gs.close()
         print("Processed", len(data), "entries")
         self.process_(data)
