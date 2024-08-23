@@ -1,5 +1,6 @@
 from typing import Type, Literal, Optional, Any
 
+import torch
 from torch import Tensor
 from torchmetrics import Metric
 from torchmetrics.classification import BinaryConfusionMatrix, MulticlassConfusionMatrix, MultilabelConfusionMatrix
@@ -11,24 +12,27 @@ class BinarySensitivity(BinaryConfusionMatrix):
     """Computes sensitivity for binary classification tasks."""
     def compute(self) -> Tensor:
         """Computes the sensitivity."""
-        self.confmat = super().compute().nan_to_num(0, 0, 0)
-        return self.confmat[1, 1] / (self.confmat[1, 1] + self.confmat[1, 0])
+        confmat = super().compute().nan_to_num(0, 0, 0)
+        denom = confmat[1, 1] + confmat[1, 0]
+        return confmat[1, 1] / torch.maximum(denom, torch.full_like(denom, 1e-7, dtype=torch.float32))
 
 
 class MulticlassSensitivity(MulticlassConfusionMatrix):
     """Computes sensitivity for multiclass classification tasks."""
     def compute(self) -> Tensor:
         """Computes the sensitivity as mean per-class sensitivity."""
-        self.confmat = super().compute().nan_to_num(0, 0, 0)
-        return (self.confmat.diag() / self.confmat.sum(dim=1)).mean()
+        confmat = super().compute().nan_to_num(0, 0, 0)
+        denom = confmat.sum(dim=1)
+        return (confmat.diag() / torch.maximum(denom, torch.full_like(denom, 1e-7, dtype=torch.float32))).mean()
 
 
 class MultilabelSensitivity(MultilabelConfusionMatrix):
     """Computes sensitivity for multilabel classification tasks."""
     def compute(self) -> Tensor:
         """Computes the sensitivity as mean per-class sensitivity"""
-        self.confmat = super().compute().nan_to_num(0, 0, 0)
-        return (self.confmat[:, 1, 1] / self.confmat[:, 1, :].sum(dim=1)).mean()
+        confmat = super().compute().nan_to_num(0, 0, 0)
+        denom = confmat[:, 1, :].sum(dim=1)
+        return (self.confmat[:, 1, 1] / torch.maximum(denom, torch.full_like(denom, 1e-7, dtype=torch.float32))).mean()
 
 
 class Sensitivity(_ClassificationTaskWrapper):
