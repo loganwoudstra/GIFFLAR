@@ -1,28 +1,28 @@
 seed: 42
 data_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/
-root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data
+root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_self
 logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs
 datasets:
-  # - name: Immunogenicity
-  #  task: classification
-  #- name: Glycosylation
-  #  task: classification
-  #- name: Taxonomy_Domain
-  #  task: multilabel
-  #- name: Taxonomy_Kingdom
-  #  task: multilabel
-  #- name: Taxonomy_Phylum
-  #  task: multilabel
-  #- name: Taxonomy_Class
-  #  task: multilabel
-  #- name: Taxonomy_Order
-  #  task: multilabel
-  #- name: Taxonomy_Family
-  #  task: multilabel
+  - name: Immunogenicity
+    task: classification
+  - name: Glycosylation
+    task: classification
+  - name: Taxonomy_Domain
+    task: multilabel
+  - name: Taxonomy_Kingdom
+    task: multilabel
+  - name: Taxonomy_Phylum
+    task: multilabel
+  - name: Taxonomy_Class
+    task: multilabel
+  - name: Taxonomy_Order
+    task: multilabel
+  - name: Taxonomy_Family
+    task: multilabel
   - name: Taxonomy_Genus
     task: multilabel
-  #- name: Taxonomy_Species
-  # task: multilabel
+  - name: Taxonomy_Species
+    task: multilabel
 pre-transforms:
 model:
   #- name: rf
@@ -52,25 +52,25 @@ model:
   #  learning_rate: 0.001
   #  optimizer: Adam
   #  suffix:
-  - name: gnngly
-    feat_dim: 1024
-    hidden_dim: 1024
-    batch_size: 512
-    num_layers: 8
-    epochs: 100
-    patience: 30
-    learning_rate: 0.001
-    optimizer: Adam
-    suffix:
-  #- name: rgcn
+  #- name: gnngly
   #  feat_dim: 1024
   #  hidden_dim: 1024
-  #  batch_size: 256
+  #  batch_size: 512
   #  num_layers: 8
   #  epochs: 100
+  #  patience: 30
   #  learning_rate: 0.001
   #  optimizer: Adam
   #  suffix:
+  - name: rgcn
+    feat_dim: 1024
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 8
+    epochs: 100
+    learning_rate: 0.001
+    optimizer: Adam
+    suffix:
   #- name: gifflar
   #  feat_dim: 1024
   #  hidden_dim: 1024

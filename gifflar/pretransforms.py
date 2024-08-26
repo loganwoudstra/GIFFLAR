@@ -138,6 +138,26 @@ class GIFFLARTransform(RootTransform):
         return data
 
 
+class RGCNTransform(RootTransform):
+    def __call__(self, data: HeteroData) -> HeteroData:
+        """
+        Add self-loops to the graph for the RGCN model.
+        """
+        data["atoms", "self", "atoms"].edge_index = torch.stack([
+            torch.arange(data["atoms"]["num_nodes"]),
+            torch.arange(data["atoms"]["num_nodes"])
+        ])
+        data["bonds", "self", "bonds"].edge_index = torch.stack([
+            torch.arange(data["bonds"]["num_nodes"]),
+            torch.arange(data["bonds"]["num_nodes"])
+        ])
+        data["monosacchs", "self", "monosacchs"].edge_index = torch.stack([
+            torch.arange(data["monosacchs"]["num_nodes"]),
+            torch.arange(data["monosacchs"]["num_nodes"])
+        ])
+        return data
+
+
 class GNNGLYTransform(RootTransform):
     """Transformation to bring data into a GNNGLY format"""
     def __init__(self, **kwargs: Any):

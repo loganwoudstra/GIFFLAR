@@ -39,7 +39,7 @@ class RGCN(DownstreamGGIN):
         self.convs = torch.nn.ModuleList()
         dims = [kwargs["feat_dim"], hidden_dim // 2] + [hidden_dim] * (num_layers - 1)
         for i in range(num_layers):
-            self.convs.append(HeteroConv({
+            convs = {
                 # Set the inner layers to be a single weight without using the nodes embedding (therefore, e=-1)
                 key: GINConv(nn.Sequential(nn.Linear(dims[i], dims[i + 1])), eps=-1) for key in [
                     ("atoms", "coboundary", "atoms"),
@@ -48,7 +48,14 @@ class RGCN(DownstreamGGIN):
                     ("bonds", "boundary", "bonds"),
                     ("monosacchs", "boundary", "monosacchs")
                 ]
-            }))
+            }
+            self_loop_weight = nn.Sequential(nn.Linear(dims[i], dims[i + 1]))
+            convs.update({
+                ("atoms", "self", "atoms"): GINConv(self_loop_weight, eps=-1),
+                ("bonds", "self", "bonds"): GINConv(self_loop_weight, eps=-1),
+                ("monosacchs", "self", "monosacchs"): GINConv(self_loop_weight, eps=-1),
+            })
+            self.convs.append(HeteroConv(convs))
             self.convs.append(HeteroPReLU({
                 "atoms": nn.PReLU(),
                 "bonds": nn.PReLU(),
