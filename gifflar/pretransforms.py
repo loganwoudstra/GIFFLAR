@@ -1,5 +1,5 @@
 import copy
-from typing import Any, Union
+from typing import Any, Union, Literal
 
 import torch
 from glycowork.glycan_data.loader import lib
@@ -16,7 +16,7 @@ from torch_geometric.transforms.base_transform import BaseTransform
 from torch_geometric.utils import from_networkx, to_dense_adj
 from tqdm import tqdm
 
-from gifflar.utils import bond_map, lib_map, atom_map
+from gifflar.utils import bond_map, lib_map, atom_map, mono_map, get_mods_list
 
 
 def split_hetero_graph(data: HeteroData) -> tuple[Data, Data, Data]:
@@ -373,6 +373,23 @@ class RandomWalkPE(RootTransform):
         return data
 
 
+class MonosaccharidePrediction(RootTransform):
+    def __init__(self, mode: Literal["mono", "mods", "both"], **kwargs):
+        super(MonosaccharidePrediction, self).__init__(**kwargs)
+        self.mode = mode
+
+    def __call__(self, data: HeteroData) -> HeteroData:
+        if self.mode in {"mono", "both"}:
+            data["mono_y"] = torch.tensor([
+                mono_map[data["tree"].nodes[x].get("name", 0)] for x in range(data["monosacchs"].num_nodes)
+            ])
+        if self.mode in {"mods", "both"}:
+            data["mods_y"] = torch.tensor([
+                get_mods_list(data["tree"].nodes[x]) for x in range(data["monosacchs"].num_nodes)
+            ])
+        return data
+
+
 class TQDMCompose(Compose):
     """Add TQDM bars to the transformations calculated in this Compose object"""
     def forward(self, data: list[Union[Data, HeteroData]]):
@@ -414,4 +431,6 @@ def get_pretransforms(**pre_transform_args) -> TQDMCompose:
             pre_transforms.append(LaplacianPE(**args))
         if name == "RandomWalkPE":
             pre_transforms.append(RandomWalkPE(**args))
+        if name == "MonosaccharidePrediction":
+            pre_transforms.append(MonosaccharidePrediction(**args))
     return TQDMCompose(pre_transforms)

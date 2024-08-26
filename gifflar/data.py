@@ -45,7 +45,7 @@ def clean_tree(tree):
         if "type" in attributes and isinstance(attributes["type"], glyles.glycans.mono.monomer.Monomer):
             tree.nodes[node].clear()
             tree.nodes[node].update({"iupac": "".join([x[0] for x in attributes["type"].recipe]),
-                                     "name": attributes["type"].name})
+                                     "name": attributes["type"].name, "recipe": attributes["type"].recipe})
         else:
             return None
     return tree

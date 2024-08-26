@@ -8,7 +8,7 @@ from torch_geometric.data import HeteroData
 from torch_geometric.nn import GINConv, HeteroConv, global_mean_pool
 
 from gifflar.pretransforms import RandomWalkPE, LaplacianPE
-from gifflar.utils import atom_map, bond_map, get_metrics
+from gifflar.utils import atom_map, bond_map, get_metrics, mono_map
 
 
 def dict_embeddings(dim: int, keys: List[object]):
@@ -39,13 +39,16 @@ def get_gin_layer(input_dim: int, output_dim: int) -> GINConv:
 
 
 def get_prediction_head(input_dim: int, num_predictions: int,
-                        task: Literal["regression", "classification", "multilabel"]):
+                        task: Literal["regression", "classification", "multilabel"], metric_prefix: str = "") -> tuple:
     head = nn.Sequential(
         nn.Linear(input_dim, input_dim // 2),
         nn.PReLU(),
         nn.Dropout(0.2),
         nn.Linear(input_dim // 2, num_predictions)
     )
+    if task == "classification" and num_predictions > 1:
+        head.append(nn.Softmax(dim=-1))
+
     if task == "regression":
         loss = nn.MSELoss()
     elif num_predictions == 1 or task == "multilabel":
@@ -53,7 +56,7 @@ def get_prediction_head(input_dim: int, num_predictions: int,
     else:
         loss = nn.CrossEntropyLoss()
 
-    metrics = get_metrics(task, num_predictions)
+    metrics = get_metrics(task, num_predictions, metric_prefix)
     return head, loss, metrics
 
 
@@ -107,8 +110,9 @@ class GlycanGIN(LightningModule):
         self.addendum = []
         if pre_transform_args is not None:
             for name, args in pre_transform_args.items():
-                self.addendum.append(pre_transforms[name].attr_name)
-                rand_dim -= args["dim"]
+                if name in pre_transforms:
+                    self.addendum.append(pre_transforms[name].attr_name)
+                    rand_dim -= args["dim"]
 
         # Set up the learnable embeddings for all node types
         self.embedding = MultiEmbedding({
@@ -226,7 +230,13 @@ class PretrainGGIN(GlycanGIN):
         # for t, task in enumerate(tasks):
         #     model, loss, metrics = get_prediction_head(hidden_dim, task["num_classes"], task["task"])
         self.atom_mask_head, self.atom_mask_loss, self.atom_mask_metrics \
-            = get_prediction_head(hidden_dim, len(atom_map) + 1, "classification")
+            = get_prediction_head(hidden_dim, len(atom_map) + 1, "classification", "atom")
+        self.bond_mask_head, self.bond_mask_loss, self.bond_mask_metrics \
+            = get_prediction_head(hidden_dim, len(bond_map) + 1, "classification", "bond")
+        self.mono_pred_head, self.mono_pred_loss, self.mono_pred_metrics \
+            = get_prediction_head(hidden_dim, len(mono_map) + 1, "classification", "mono")
+        self.mods_pred_head, self.mods_pred_loss, self.mods_pred_metrics \
+            = get_prediction_head(hidden_dim, 16, "multilabel", "mods")
 
     def forward(self, batch: HeteroData) -> dict:
         """
@@ -240,20 +250,43 @@ class PretrainGGIN(GlycanGIN):
         """
         node_embeds = super().forward(batch)
         atom_preds = self.atom_mask_head(node_embeds["atoms"])
+        bond_preds = self.bond_mask_head(node_embeds["bonds"])
+        mono_preds = self.mono_pred_head(node_embeds["monosacchs"])
+        mods_preds = self.mods_pred_head(node_embeds["monosacchs"])
         return {
             "node_embed": node_embeds,
             "atom_preds": atom_preds,
+            "bond_preds": bond_preds,
+            "mono_preds": mono_preds,
+            "mods_preds": mods_preds,
         }
 
     def shared_step(self, batch: HeteroData, stage: Literal["train", "val", "test"]) -> dict:
         fwd_dict = self.forward(batch)
 
-        fwd_dict["atom_loss"] = self.atom_mask_loss(fwd_dict["atom_preds"], batch["atoms_y"])
-        fwd_dict["loss"] = fwd_dict["atom_loss"]
+        # print(self.mono_pred_head)
+        # print(type(self.mono_pred_loss))
+        # print(fwd_dict["mono_preds"])
+        # print(batch["bonds_y"])
+        # print(batch["mono_y"])
+        # print(torch.tensor(batch["mono_y"]).reshape(fwd_dict["mono_preds"].shape[:-1]))
+        # print(torch.tensor(batch["mono_y"]).reshape(fwd_dict["mono_preds"].shape[:-1]).shape)
 
-        self.atom_mask_metrics[stage].update(fwd_dict["atom_preds"], batch["atoms_y"])
+        fwd_dict["atom_loss"] = self.atom_mask_loss(fwd_dict["atom_preds"], batch["atoms_y"] - 1)
+        fwd_dict["bond_loss"] = self.bond_mask_loss(fwd_dict["bond_preds"], batch["bonds_y"] - 1)
+        fwd_dict["mono_loss"] = self.mono_pred_loss(fwd_dict["mono_preds"], torch.tensor(batch["mono_y"]).reshape(fwd_dict["mono_preds"].shape[:-1]))
+        fwd_dict["mods_loss"] = self.mods_pred_loss(fwd_dict["mods_preds"], batch["mods_y"].float())
+        fwd_dict["loss"] = fwd_dict["atom_loss"] + fwd_dict["bond_loss"] + fwd_dict["mono_loss"] + fwd_dict["mods_loss"]
+
+        self.atom_mask_metrics[stage].update(fwd_dict["atom_preds"], batch["atoms_y"] - 1)
+        self.bond_mask_metrics[stage].update(fwd_dict["bond_preds"], batch["bonds_y"] - 1)
+        self.mono_pred_metrics[stage].update(fwd_dict["mono_preds"], torch.tensor(batch["mono_y"]).reshape(fwd_dict["mono_preds"].shape[:-1]))
+        self.mods_pred_metrics[stage].update(fwd_dict["mods_preds"], batch["mods_y"])
 
         self.log(f"{stage}/atom_loss", fwd_dict["atom_loss"], batch_size=self.batch_size)
+        self.log(f"{stage}/bond_loss", fwd_dict["bond_loss"], batch_size=self.batch_size)
+        self.log(f"{stage}/mono_loss", fwd_dict["mono_loss"], batch_size=self.batch_size)
+        self.log(f"{stage}/mods_loss", fwd_dict["mods_loss"], batch_size=self.batch_size)
         self.log(f"{stage}/loss", fwd_dict["loss"], batch_size=self.batch_size)
 
         return fwd_dict
@@ -262,6 +295,18 @@ class PretrainGGIN(GlycanGIN):
         metrics = self.atom_mask_metrics[stage].compute()
         self.log_dict(metrics)
         self.atom_mask_metrics[stage].reset()
+
+        metrics = self.bond_mask_metrics[stage].compute()
+        self.log_dict(metrics)
+        self.bond_mask_metrics[stage].reset()
+
+        metrics = self.mono_pred_metrics[stage].compute()
+        self.log_dict(metrics)
+        self.mono_pred_metrics[stage].reset()
+
+        metrics = self.mods_pred_metrics[stage].compute()
+        self.log_dict(metrics)
+        self.mods_pred_metrics[stage].reset()
 
 
 class DownstreamGGIN(GlycanGIN):
@@ -293,7 +338,7 @@ class DownstreamGGIN(GlycanGIN):
             nn.Linear(hidden_dim // 2, self.output_dim)
         )
         if self.task == "multilabel":
-            self.sigmoid = nn.Sigmoid()
+            self.head.append(nn.Sigmoid())
 
         # Define the loss function based on the task and the number of outputs to predict
         if self.task == "regression":
@@ -370,8 +415,6 @@ class DownstreamGGIN(GlycanGIN):
         if self.task != "multilabel":
             if list(fwd_dict["preds"].shape) == [len(batch["y"]), 1]:
                 fwd_dict["preds"] = fwd_dict["preds"][:, 0]
-        else:
-            fwd_dict["preds"] = self.sigmoid(fwd_dict["preds"])
 
         # Compute the loss based on the task and the number of outputs to predict
         if self.output_dim == 1 or self.task == "multilabel":

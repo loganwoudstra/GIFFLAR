@@ -1,0 +1,23 @@
+seed: 42
+file_path: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_pret/glycans.txt
+logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret
+pre-transforms:
+  MonosaccharidePrediction:
+    mode: both
+transforms:
+  - name: TypeMasking
+    cell: atoms
+    prob: 0.15
+  - name: TypeMasking
+    cell: bonds
+    prob: 0.15
+model:
+  name: gifflar
+  feat_dim: 1024
+  hidden_dim: 1024
+  batch_size: 256
+  num_layers: 8
+  epochs: 100
+  learning_rate: 0.001
+  optimizer: Adam
+  suffix:

@@ -8,7 +8,7 @@ import torch
 import yaml
 from jsonargparse import ArgumentParser
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import RichProgressBar, RichModelSummary
+from pytorch_lightning.callbacks import RichProgressBar, RichModelSummary, ModelCheckpoint
 from pytorch_lightning.loggers import CSVLogger, Logger
 from torch_geometric import seed_everything
 
@@ -146,7 +146,7 @@ def pretrain(**kwargs: Any) -> None:
     Params:
         kwargs: The configuration for the training.
     """
-    transforms, task_list = get_transforms(**(kwargs.get("transforms", None) or {}))
+    transforms, task_list = get_transforms(kwargs.get("transforms", []))
     datamodule = PretrainGDM(
         file_path=kwargs["file_path"], hash_code=kwargs["hash"], batch_size=kwargs["model"].get("batch_size", 1),
         transform=transforms, pre_transform=get_pretransforms(**(kwargs.get("pre-transforms", None) or {})),
@@ -159,6 +159,7 @@ def pretrain(**kwargs: Any) -> None:
 
     trainer = Trainer(
         callbacks=[
+            ModelCheckpoint(save_top_k=-1),
             RichModelSummary(),
             RichProgressBar(),
         ],

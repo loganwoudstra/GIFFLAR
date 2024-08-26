@@ -23,6 +23,24 @@ atom_map = {6: 2, 7: 3, 8: 4, 15: 5, 16: 6}
 # bond_map = {Chem.BondType.SINGLE: 0, Chem.BondType.AROMATIC: 1, Chem.BondType.DOUBLE: 2, Chem.BondType.TRIPLE: 3}
 bond_map = {Chem.BondDir.BEGINDASH: 2, Chem.BondDir.BEGINWEDGE: 3, Chem.BondDir.NONE: 4}
 lib_map = {n: i + 2 for i, n in enumerate(lib)}
+mono_map = {n: i + 1 for i, n in enumerate([
+    'Glc', 'Man', 'Gal', 'Gul', 'Alt', 'All', 'Tal', 'Ido', 'Qui', 'Rha', 'Fuc', 'Oli', 'Tyv', 'Abe', 'Par', 'Dig',
+    'Col', 'Ara', 'Lyx', 'Xyl', 'Rib', 'Kdn', 'Neu', 'Sia', 'Pse', 'Leg', 'Aci', 'Bac', 'Kdo', 'Dha', 'Mur', 'Api',
+    'Fru', 'Tag', 'Sor', 'Psi', 'Ery', 'Thre', 'Rul', 'Xul', 'Unk', 'Ace', 'Aco', 'Asc', 'Fus', 'Ins', 'Ko', 'Pau',
+    'Per', 'Sed', 'Sug', 'Vio', 'Xlu', 'Yer', 'Erwiniose'
+])}
+mods_map = {n: i + 1 for i, n in enumerate([
+    'Ac', 'DD', 'DL', 'LD', 'LL', 'en', 'A', 'N', 'F', 'I', 'S', 'P', 'NAc', 'ol', 'Me'
+])}
+
+
+def get_mods_list(node):
+    ids = [0] * 16
+    for mod in node["recipe"]:
+        if mod != node["name"]:
+            ids[mods_map.get(re.sub(r'[^A-Za-z]', '', mod[0]), 0)] = 1
+    return ids
+
 
 
 def get_sl_model(
@@ -76,7 +94,8 @@ def get_sl_model(
 
 def get_metrics(
         task: Literal["regression", "classification", "multilabel"],
-        n_outputs: int
+        n_outputs: int,
+        prefix: str = "",
 ) -> Dict[str, MetricCollection]:
     """
     Collect the metrics to monitor a models learning progress. For regression tasks, we monitor
@@ -116,7 +135,7 @@ def get_metrics(
             MatthewsCorrCoef(**metric_args),
             Sensitivity(**metric_args),
         ])
-    return {"train": m.clone(prefix="train/"), "val": m.clone(prefix="val/"), "test": m.clone(prefix="test/")}
+    return {"train": m.clone(prefix="train/" + prefix), "val": m.clone(prefix="val/" + prefix), "test": m.clone(prefix="test/" + prefix)}
 
 
 def mol2nx(mol: rdkit.Chem.Mol, node: int) -> nx.Graph:
