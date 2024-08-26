@@ -7,6 +7,7 @@ from torch import nn
 from torch_geometric.data import HeteroData
 from torch_geometric.nn import GINConv, HeteroConv, global_mean_pool
 
+from gifflar.loss import MultiLoss
 from gifflar.pretransforms import RandomWalkPE, LaplacianPE
 from gifflar.utils import atom_map, bond_map, get_metrics, mono_map
 
@@ -238,6 +239,8 @@ class PretrainGGIN(GlycanGIN):
         self.mods_pred_head, self.mods_pred_loss, self.mods_pred_metrics \
             = get_prediction_head(hidden_dim, 16, "multilabel", "mods")
 
+        self.loss = MultiLoss(4, dynamic=kwargs.get("loss", "static") == "dynamic")
+
     def forward(self, batch: HeteroData) -> dict:
         """
         Forward pass of the model.
@@ -276,7 +279,9 @@ class PretrainGGIN(GlycanGIN):
         fwd_dict["bond_loss"] = self.bond_mask_loss(fwd_dict["bond_preds"], batch["bonds_y"] - 1)
         fwd_dict["mono_loss"] = self.mono_pred_loss(fwd_dict["mono_preds"], torch.tensor(batch["mono_y"]).reshape(fwd_dict["mono_preds"].shape[:-1]))
         fwd_dict["mods_loss"] = self.mods_pred_loss(fwd_dict["mods_preds"], batch["mods_y"].float())
-        fwd_dict["loss"] = fwd_dict["atom_loss"] + fwd_dict["bond_loss"] + fwd_dict["mono_loss"] + fwd_dict["mods_loss"]
+        fwd_dict["loss"] = self.loss([
+            fwd_dict["atom_loss"], fwd_dict["bond_loss"], fwd_dict["mono_loss"], fwd_dict["mods_loss"]
+        ])
 
         self.atom_mask_metrics[stage].update(fwd_dict["atom_preds"], batch["atoms_y"] - 1)
         self.bond_mask_metrics[stage].update(fwd_dict["bond_preds"], batch["bonds_y"] - 1)
