@@ -119,7 +119,12 @@ class GlycanGIN(LightningModule):
 
         # Define the GIN layers to embed messages between nodes
         self.convs = torch.nn.ModuleList()
-        dims = [feat_dim, hidden_dim // 2] + [hidden_dim] * (num_layers - 1)
+        dims = [feat_dim]
+        if feat_dim <= hidden_dim // 2:
+            dims += [hidden_dim // 2]
+        else:
+            dims += [hidden_dim]
+        dims += [hidden_dim] * (num_layers - 1)
         for i in range(num_layers):
             self.convs.append(HeteroConv({
                 key: get_gin_layer(dims[i], dims[i + 1]) for key in [

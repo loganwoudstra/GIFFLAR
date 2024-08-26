@@ -39,7 +39,7 @@ class GNNGLY(DownstreamGGIN):
             task: The task to solve
             kwargs: Additional arguments to pass to the model
         """
-        super().__init__(hidden_dim, output_dim, task)
+        super().__init__(hidden_dim, output_dim, task, **kwargs)
 
         del self.convs
 

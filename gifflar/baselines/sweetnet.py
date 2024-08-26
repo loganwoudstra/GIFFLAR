@@ -23,7 +23,7 @@ class SweetNetLightning(DownstreamGGIN):
             task: What kind of dataset the model is trained on, necessary to select the metrics.
             **kwargs: Additional arguments to pass to the model.
         """
-        super().__init__(hidden_dim, output_dim, task)
+        super().__init__(hidden_dim, output_dim, task, **kwargs)
 
         del self.convs
         del self.head

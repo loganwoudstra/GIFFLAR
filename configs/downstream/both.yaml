@@ -24,10 +24,10 @@ datasets:
   - name: Taxonomy_Species
     task: multilabel
 pre-transforms:
-  LaplacianPE:
-    dim: 20
-  RandomWalkPE:
-    dim: 20
+#  LaplacianPE:
+#    dim: 20
+#  RandomWalkPE:
+#    dim: 20
 model:
   - name: rgcn
     feat_dim: 128

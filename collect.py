@@ -8,7 +8,7 @@ from openpyxl.styles import Font
 
 model_order = {m: i for i, m in enumerate(["rf", "svm", "xgb", "mlp", "gnngly", "sweetnet", "rgcn", "gifflar"])}
 appendix_order = {"lp": 1, "rw": 2, "both": 3}
-with pd.ExcelWriter('results.xlsx', engine='xlsxwriter') as writer:
+with pd.ExcelWriter(sys.argv[2] + '.xlsx', engine='xlsxwriter') as writer:
     for metric in ["Accuracy", "MatthewsCorrCoef", "AUROC", "Sensitivity"]:
         root = Path(sys.argv[1])
         models = sorted([str(x).split("/")[-1] for x in root.iterdir() if x.is_dir()], key=lambda x: (model_order.get(x.split("_")[0], 100), appendix_order.get(x.split("_")[-1], 0)))
