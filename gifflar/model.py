@@ -1,3 +1,4 @@
+import copy
 from typing import List, Literal, Dict, Optional, Any
 
 from glycowork.glycan_data.loader import lib
@@ -291,16 +292,38 @@ class PretrainGGIN(GlycanGIN):
             "mods_preds": mods_preds,
         }
 
+    def predict_step(self, batch: HeteroData) -> dict:
+        """
+        Predict the output of the model and return the node embeddings from all layers
+
+        Args:
+            batch: The batch of data to process
+
+        Returns:
+            A dictionary containing:
+                node_embeds: The node embeddings from all layers
+        """
+
+        for key in batch.x_dict.keys():
+            # Compute random encodings for the atom type and include positional encodings
+            pes = [self.embedding.forward(batch.x_dict[key], key)]
+            for pe in self.addendum:
+                pes.append(batch[f"{key}_{pe}"])
+
+            batch.x_dict[key] = torch.concat(pes, dim=1)
+
+        node_embeds = []
+        for conv in self.convs:
+            if isinstance(conv, HeteroConv):
+                batch.x_dict = conv(batch.x_dict, batch.edge_index_dict)
+                node_embeds.append(copy.deepcopy(batch.x_dict))
+            else:  # the layer is an activation function from the RGCN
+                batch.x_dict = conv(batch.x_dict)
+
+        return {"node_embeds": node_embeds}
+
     def shared_step(self, batch: HeteroData, stage: Literal["train", "val", "test"]) -> dict:
         fwd_dict = self.forward(batch)
-
-        # print(self.mono_pred_head)
-        # print(type(self.mono_pred_loss))
-        # print(fwd_dict["mono_preds"])
-        # print(batch["bonds_y"])
-        # print(batch["mono_y"])
-        # print(torch.tensor(batch["mono_y"]).reshape(fwd_dict["mono_preds"].shape[:-1]))
-        # print(torch.tensor(batch["mono_y"]).reshape(fwd_dict["mono_preds"].shape[:-1]).shape)
 
         fwd_dict["atom_loss"] = self.atom_mask_loss(fwd_dict["atom_preds"], batch["atoms_y"] - 1)
         fwd_dict["bond_loss"] = self.bond_mask_loss(fwd_dict["bond_preds"], batch["bonds_y"] - 1)

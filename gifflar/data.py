@@ -11,7 +11,7 @@ import torch
 from rdkit import Chem, RDLogger
 from rdkit.Chem import rdDepictor
 from torch.utils.data import DataLoader  # has to be these, otherwise collate_fn does not work!
-from torch_geometric.data import InMemoryDataset, HeteroData, Dataset
+from torch_geometric.data import InMemoryDataset, HeteroData
 from pytorch_lightning import LightningDataModule
 import glyles
 from glyles.glycans.factory.factory import MonomerFactory
