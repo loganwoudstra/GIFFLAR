@@ -241,6 +241,33 @@ class PretrainGGIN(GlycanGIN):
 
         self.loss = MultiLoss(4, dynamic=kwargs.get("loss", "static") == "dynamic")
 
+    def to(self, device):
+        self.atom_mask_head.to(device)
+        self.atom_mask_loss.to(device)
+        self.atom_mask_metrics["train"].to(device)
+        self.atom_mask_metrics["val"].to(device)
+        self.atom_mask_metrics["test"].to(device)
+
+        self.bond_mask_head.to(device)
+        self.bond_mask_loss.to(device)
+        self.bond_mask_metrics["train"].to(device)
+        self.bond_mask_metrics["val"].to(device)
+        self.bond_mask_metrics["test"].to(device)
+
+        self.mono_pred_head.to(device)
+        self.mono_pred_loss.to(device)
+        self.mono_pred_metrics["train"].to(device)
+        self.mono_pred_metrics["val"].to(device)
+        self.mono_pred_metrics["test"].to(device)
+
+        self.mods_pred_head.to(device)
+        self.mods_pred_loss.to(device)
+        self.mods_pred_metrics["train"].to(device)
+        self.mods_pred_metrics["val"].to(device)
+        self.mods_pred_metrics["test"].to(device)
+
+        return super().to(device)
+
     def forward(self, batch: HeteroData) -> dict:
         """
         Forward pass of the model.

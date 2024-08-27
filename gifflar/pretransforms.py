@@ -381,7 +381,7 @@ class MonosaccharidePrediction(RootTransform):
     def __call__(self, data: HeteroData) -> HeteroData:
         if self.mode in {"mono", "both"}:
             data["mono_y"] = torch.tensor([
-                mono_map[data["tree"].nodes[x].get("name", 0)] for x in range(data["monosacchs"].num_nodes)
+                mono_map.get(data["tree"].nodes[x]["name"], 0) for x in range(data["monosacchs"].num_nodes)
             ])
         if self.mode in {"mods", "both"}:
             data["mods_y"] = torch.tensor([
@@ -425,6 +425,7 @@ def get_pretransforms(**pre_transform_args) -> TQDMCompose:
         GNNGLYTransform(**pre_transform_args.get("GNNGLYTransform", {})),
         ECFPTransform(**pre_transform_args.get("ECFPTransform", {})),
         SweetNetTransform(**pre_transform_args.get("SweetNetTransform", {})),
+        RGCNTransform(),
     ]
     for name, args in pre_transform_args.items():
         if name == "LaplacianPE":

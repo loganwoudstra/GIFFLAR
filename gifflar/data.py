@@ -344,9 +344,8 @@ class PretrainGDM(GlycanDataModule):
             **kwargs: Additional arguments to pass to the Pretrain
         """
         root = Path(file_path).parent
-        filename = Path(file_path).name
         super().__init__(batch_size)
-        ds = PretrainGDs(root=root, filename=filename, hash_code=hash_code, transform=transform,
+        ds = PretrainGDs(root=root, filename=file_path, hash_code=hash_code, transform=transform,
                          pre_transform=pre_transform, **kwargs)
         self.train, self.val = torch.utils.data.dataset.random_split(ds, [train_frac, 1 - train_frac])
 
