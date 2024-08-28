@@ -5,8 +5,8 @@ import torch
 from torch import nn
 from torch_geometric.nn import GCNConv, global_mean_pool
 
-from gifflar.data import HeteroDataBatch
-from gifflar.model import DownstreamGGIN
+from gifflar.data.hetero import HeteroDataBatch
+from gifflar.model.downstream import DownstreamGGIN
 
 """
 # Model properties extracted from GNNGLY

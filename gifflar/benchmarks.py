@@ -1,33 +1,13 @@
 import urllib.request
 from pathlib import Path
-from typing import Dict, Optional, Literal
+from typing import Dict, Literal
 
 import numpy as np
 import pandas as pd
 from glycowork.glycan_data.loader import df_species as taxonomy
-from glyles import convert
 from tqdm import tqdm
 
-
-def iupac2smiles(iupac: str) -> Optional[str]:
-    """
-    Convert IUPAC-condensed representations to SMILES strings (or None if the smiles string cannot be valid).
-
-    Args:
-        iupac: The IUPAC-condensed representation of the glycan.
-
-    Returns:
-        The SMILES string representation of the glycan.
-    """
-    if any([x in iupac for x in ["?", "{", "}"]]):
-        return None
-    try:
-        smiles = convert(iupac)[0][1]
-        if len(smiles) < 10:
-            return None
-        return smiles
-    except:
-        return None
+from gifflar.utils import iupac2smiles
 
 
 def get_taxonomy() -> pd.DataFrame:

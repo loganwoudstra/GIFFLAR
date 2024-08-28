@@ -2,8 +2,8 @@ from typing import Any
 
 import torch
 
-from gifflar.data import HeteroDataBatch
-from gifflar.model import DownstreamGGIN
+from gifflar.data.hetero import HeteroDataBatch
+from gifflar.model.downstream import DownstreamGGIN
 
 
 class MLP(DownstreamGGIN):

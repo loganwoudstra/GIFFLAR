@@ -1,6 +1,6 @@
 import pickle
 
-from gifflar.data import GlycanStorage
+from gifflar.data.utils import GlycanStorage
 
 with open("gifflar/acquisition/collected.pkl", "rb") as f:
     _, unique_glycans, _ = pickle.load(f)

@@ -6,8 +6,8 @@ from torch import nn
 from torch_geometric.nn import global_mean_pool, GraphConv
 from glycowork.glycan_data.loader import lib
 
-from gifflar.data import HeteroDataBatch
-from gifflar.model import DownstreamGGIN
+from gifflar.data.hetero import HeteroDataBatch
+from gifflar.model.downstream import DownstreamGGIN
 
 
 class SweetNetLightning(DownstreamGGIN):

@@ -1,27 +1,23 @@
-import copy
-import hashlib
-import json
-from pathlib import Path
-from typing import Any, Generator
+from typing import Any
 
 import torch
-import yaml
 from jsonargparse import ArgumentParser
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import RichProgressBar, RichModelSummary, ModelCheckpoint
 from pytorch_lightning.loggers import CSVLogger, Logger
 from torch_geometric import seed_everything
 
-from gifflar.baselines.gnngly import GNNGLY
-from gifflar.baselines.mlp import MLP
-from gifflar.baselines.rgcn import RGCN
-from gifflar.baselines.sweetnet import SweetNetLightning
-from gifflar.data import DownsteamGDM, PretrainGDM
+from gifflar.data.modules import DownsteamGDM, PretrainGDM
+from gifflar.model.baselines.gnngly import GNNGLY
+from gifflar.model.baselines.mlp import MLP
+from gifflar.model.baselines.rgcn import RGCN
+from gifflar.model.baselines.sweetnet import SweetNetLightning
 from gifflar.benchmarks import get_dataset
-from gifflar.model import DownstreamGGIN, PretrainGGIN
+from gifflar.model.downstream import DownstreamGGIN
+from gifflar.model.pretrain import PretrainGGIN
 from gifflar.pretransforms import get_pretransforms
 from gifflar.transforms import get_transforms
-from gifflar.utils import get_sl_model, get_metrics
+from gifflar.utils import get_sl_model, get_metrics, read_yaml_config, hash_dict, unfold_config
 
 MODELS = {
     "gifflar": DownstreamGGIN,
@@ -168,79 +164,6 @@ def pretrain(**kwargs: Any) -> None:
     )
     print(transforms)
     trainer.fit(model, datamodule)
-
-
-def read_yaml_config(filename: str | Path) -> dict:
-    """Read in yaml config for training."""
-    with open(filename, "r") as file:
-        config = yaml.load(file, Loader=yaml.FullLoader)
-    return config
-
-
-def merge_dicts(a: dict, b: dict) -> dict:
-    """Merge two dictionaries a and b."""
-    out = a
-    for key in b:
-        if key in a and isinstance(a[key], dict) and isinstance(b[key], dict):
-            out[key] = merge_dicts(a[key], b[key])
-        else:
-            out[key] = b[key]
-    return out
-
-
-def unfold_config(config: dict) -> Generator[dict, None, None]:
-    """
-    Unfold the configuration by expanding multiple model and dataset settings into individual configs.
-
-    Params:
-        config: The configuration to unfold.
-
-    Yields:
-        The unfolded configuration.
-    """
-    if isinstance(config["datasets"], dict):
-        datasets = [config["datasets"]]
-    else:
-        datasets = config["datasets"]
-    del config["datasets"]
-
-    if isinstance(config["model"], dict):
-        models = [config["model"]]
-    else:
-        models = config["model"]
-    del config["model"]
-
-    for dataset in datasets:
-        for model in models:
-            tmp_config = copy.deepcopy(config)
-            tmp_config["dataset"] = dataset
-            if "label" in tmp_config["dataset"] and not isinstance(tmp_config["dataset"]["label"], list):
-                tmp_config["dataset"]["label"] = [tmp_config["dataset"]["label"]]
-            tmp_config["model"] = model
-            yield tmp_config
-
-
-def hash_dict(input_dict: dict, n_chars: int = 8) -> str:
-    """
-    Generate a hash of a dictionary.
-
-    Params:
-        input_dict: The dictionary to hash.
-        n_chars: The number of characters to include in the hash.
-
-    Returns:
-        The hash of the dictionary.
-    """
-    # Convert the dictionary to a JSON string
-    dict_str = json.dumps(input_dict, sort_keys=True)
-
-    # Generate a SHA-256 hash of the string
-    hash_obj = hashlib.sha256(dict_str.encode())
-
-    # Get the first 8 characters of the hexadecimal digest
-    hash_str = hash_obj.hexdigest()[:n_chars]
-
-    return hash_str
 
 
 def main(config):

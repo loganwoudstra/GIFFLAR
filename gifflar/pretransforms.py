@@ -7,14 +7,16 @@ import yaml
 from glycowork.glycan_data.loader import lib
 from glycowork.motif.graph import glycan_to_nxGraph
 
-from gifflar.data import hetero_collate
-from gifflar.model import PretrainGGIN
+from gifflar.data.hetero import hetero_collate
+from gifflar.model.pretrain import PretrainGGIN
 
 try:
     from rdkit.Chem import rdFingerprintGenerator
+
     RDKIT_GEN = True
 except ImportError:
     from rdkit.Chem import AllChem
+
     RDKIT_GEN = False
 from torch_geometric.data import Data, HeteroData
 from torch_geometric.transforms import Compose, AddLaplacianEigenvectorPE
@@ -50,7 +52,7 @@ def split_hetero_graph(data: HeteroData) -> tuple[Data, Data, Data]:
     return atoms_data, bond_data, monosacchs_data
 
 
-def hetero_to_homo(data):
+def hetero_to_homo(data: HeteroData) -> Data:
     """
     Convert a heterogeneous graph to a homogeneous by collapsing the node types and removing all node features
     """
@@ -68,12 +70,14 @@ def hetero_to_homo(data):
 
 class RootTransform(BaseTransform):
     """Root transformation class."""
-    def __init__(self, **kwargs):
+
+    def __init__(self, **kwargs: Any):
         pass
 
 
 class GIFFLARTransform(RootTransform):
     """Transformation to bring data into a GIFFLAR format"""
+
     def __call__(self, data: HeteroData) -> HeteroData:
         """
         Transform the data into a GIFFLAR format. This means to compute the simplex network and create a heterogenous
@@ -166,6 +170,7 @@ class RGCNTransform(RootTransform):
 
 class GNNGLYTransform(RootTransform):
     """Transformation to bring data into a GNNGLY format"""
+
     def __init__(self, **kwargs: Any):
         """
         Initialize the GNNGLY transformation by setting up the one-hot encoders.
@@ -206,7 +211,8 @@ class GNNGLYTransform(RootTransform):
 
 class ECFPTransform(RootTransform):
     """Transformation to bring data into an ECFP format for MLP and SL model usage"""
-    def __init__(self, **kwargs):
+
+    def __init__(self, **kwargs: Any):
         """
         Initialize the ECFP transformation.
 
@@ -231,7 +237,8 @@ class ECFPTransform(RootTransform):
         if RDKIT_GEN:
             data["fp"] = torch.tensor(self.ecfp.GetFingerprint(data["mol"]), dtype=torch.float).reshape(1, -1)
         else:
-            data["fp"] = torch.tensor(AllChem.GetMorganFingerprintAsBitVect(data["mol"], 2, nBits=1024), dtype=torch.float).reshape(1, -1)
+            data["fp"] = torch.tensor(AllChem.GetMorganFingerprintAsBitVect(data["mol"], 2, nBits=1024),
+                                      dtype=torch.float).reshape(1, -1)
         return data
 
 
@@ -309,7 +316,8 @@ class LaplacianPE(AddLaplacianEigenvectorPE):
             d = hetero_to_homo(data)
             super(LaplacianPE, self).forward(d)
             data[f"atoms_{self.attr_name}"] = d[self.attr_name][:data["atoms"]["num_nodes"]]
-            data[f"bonds_{self.attr_name}"] = d[self.attr_name][data["atoms"]["num_nodes"]:data["monosacchs"]["num_nodes"]]
+            data[f"bonds_{self.attr_name}"] = d[self.attr_name][
+                                              data["atoms"]["num_nodes"]:data["monosacchs"]["num_nodes"]]
             data[f"monosacchs_{self.attr_name}"] = d[self.attr_name][data["monosacchs"]["num_nodes"]:]
         return data
 
@@ -374,17 +382,37 @@ class RandomWalkPE(RootTransform):
             d = hetero_to_homo(data)
             self.forward(d)
             data[f"atoms_{self.attr_name}"] = d[self.attr_name][:data["atoms"]["num_nodes"]]
-            data[f"bonds_{self.attr_name}"] = d[self.attr_name][data["atoms"]["num_nodes"]:data["monosacchs"]["num_nodes"]]
+            data[f"bonds_{self.attr_name}"] = d[self.attr_name][
+                                              data["atoms"]["num_nodes"]:data["monosacchs"]["num_nodes"]]
             data[f"monosacchs_{self.attr_name}"] = d[self.attr_name][data["monosacchs"]["num_nodes"]:]
         return data
 
 
 class MonosaccharidePrediction(RootTransform):
-    def __init__(self, mode: Literal["mono", "mods", "both"], **kwargs):
+    def __init__(self, mode: Literal["mono", "mods", "both"], **kwargs: Any):
+        """
+        Add labels for monosaccharide-prediction to the data.
+
+        Params:
+            mode: which tasks to add:
+                mono: Only monomer-prediction
+                mods: Only prediction of monosaccharides
+                both: mono + mods
+            kwargs: Additional arguments
+        """
         super(MonosaccharidePrediction, self).__init__(**kwargs)
         self.mode = mode
 
     def __call__(self, data: HeteroData) -> HeteroData:
+        """
+        Add mono_y and mods_y to the data.
+
+        Params:
+            data: The input data to be transformed.
+
+        Returns:
+            The transformed data.
+        """
         if self.mode in {"mono", "both"}:
             data["mono_y"] = torch.tensor([
                 mono_map.get(data["tree"].nodes[x]["name"], 0) for x in range(data["monosacchs"].num_nodes)
@@ -397,7 +425,17 @@ class MonosaccharidePrediction(RootTransform):
 
 
 class GIFFLAREmbed(RootTransform):
-    def __init__(self, hparams_path: str | Path, ckpt_path: str | Path, **kwargs):
+    """Run a GIFFLAR model to embed the input data."""
+
+    def __init__(self, hparams_path: str | Path, ckpt_path: str | Path, **kwargs: Any):
+        """
+        Initialize the GIFFLAREmbed transformation.
+
+        Params:
+            hparams_path: The path to the hyperparameters file.
+            ckpt_path: The path to the checkpoint file.
+            kwargs: Additional arguments.
+        """
         super(GIFFLAREmbed, self).__init__(**kwargs)
         with open(hparams_path, "r") as file:
             config = yaml.load(file, Loader=yaml.FullLoader)
@@ -406,9 +444,21 @@ class GIFFLAREmbed(RootTransform):
         self.model.eval()
 
     def __call__(self, data: HeteroData) -> HeteroData:
+        """
+        Embed the input data using the GIFFLAR model.
+
+        Params:
+            data: The input data to be transformed.
+
+        Returns:
+            The transformed data.
+        """
+        # Turn the data into a batch and compute the node embeddings
         batch = hetero_collate([data])
         with torch.no_grad():
             node_embeds = self.model.predict(batch)
+
+        # Compute the graph embedding based on the node embeddings
         data["fp"] = torch.cat([
             node_embeds["atoms"].x, node_embeds["bonds"].x, node_embeds["monosacchs"].x
         ], dim=0).mean()
@@ -417,6 +467,7 @@ class GIFFLAREmbed(RootTransform):
 
 class TQDMCompose(Compose):
     """Add TQDM bars to the transformations calculated in this Compose object"""
+
     def forward(self, data: list[Union[Data, HeteroData]]):
         """
         Apply transformation in order to the input data and keep TQDM bars for process tracking.

@@ -4,7 +4,7 @@ import torch
 from torch import nn
 from torch_geometric.nn import HeteroConv, GINConv
 
-from gifflar.model import DownstreamGGIN
+from gifflar.model.downstream import DownstreamGGIN
 
 
 class HeteroPReLU(nn.Module):

@@ -1,13 +1,14 @@
+import copy
+import hashlib
+import json
 import re
 from pathlib import Path
-from typing import NamedTuple, Optional, Literal, TypedDict, Any, Dict
+from typing import Optional, Literal, Any, Dict, Generator
 
-import networkx as nx
-import rdkit.Chem
+import yaml
 from glycowork.glycan_data.loader import lib
-from glyles.glycans.poly.merger import Merger
+from glyles import convert
 from rdkit import Chem
-from rdkit.Chem import BondType
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, GradientBoostingRegressor, \
     GradientBoostingClassifier
@@ -15,8 +16,8 @@ from sklearn.multioutput import MultiOutputRegressor, MultiOutputClassifier
 from sklearn.svm import LinearSVR, SVC, SVR
 from torchmetrics import MetricCollection, Accuracy, AUROC, MatthewsCorrCoef, MeanAbsoluteError, MeanSquaredError, \
     R2Score
-from gifflar.sensitivity import Sensitivity
 
+from gifflar.sensitivity import Sensitivity
 
 # MASK, unknown, values...
 atom_map = {6: 2, 7: 3, 8: 4, 15: 5, 16: 6}
@@ -34,13 +35,119 @@ mods_map = {n: i + 1 for i, n in enumerate([
 ])}
 
 
+def get_number_of_classes(cell: str) -> int:
+    """Get the number of classes for a given cell."""
+    match (cell):
+        case "atoms":
+            return len(atom_map) + 1
+        case "bonds":
+            return len(bond_map) + 1
+        case "monosacch":
+            return len(lib_map) + 1
+        case _:
+            return 0
+
+
+def read_yaml_config(filename: str | Path) -> dict:
+    """Read in yaml config for training."""
+    with open(filename, "r") as file:
+        config = yaml.load(file, Loader=yaml.FullLoader)
+    return config
+
+
+def merge_dicts(a: dict, b: dict) -> dict:
+    """Merge two dictionaries a and b."""
+    out = a
+    for key in b:
+        if key in a and isinstance(a[key], dict) and isinstance(b[key], dict):
+            out[key] = merge_dicts(a[key], b[key])
+        else:
+            out[key] = b[key]
+    return out
+
+
+def unfold_config(config: dict) -> Generator[dict, None, None]:
+    """
+    Unfold the configuration by expanding multiple model and dataset settings into individual configs.
+
+    Params:
+        config: The configuration to unfold.
+
+    Yields:
+        The unfolded configuration.
+    """
+    if isinstance(config["datasets"], dict):
+        datasets = [config["datasets"]]
+    else:
+        datasets = config["datasets"]
+    del config["datasets"]
+
+    if isinstance(config["model"], dict):
+        models = [config["model"]]
+    else:
+        models = config["model"]
+    del config["model"]
+
+    for dataset in datasets:
+        for model in models:
+            tmp_config = copy.deepcopy(config)
+            tmp_config["dataset"] = dataset
+            if "label" in tmp_config["dataset"] and not isinstance(tmp_config["dataset"]["label"], list):
+                tmp_config["dataset"]["label"] = [tmp_config["dataset"]["label"]]
+            tmp_config["model"] = model
+            yield tmp_config
+
+
+def hash_dict(input_dict: dict, n_chars: int = 8) -> str:
+    """
+    Generate a hash of a dictionary.
+
+    Params:
+        input_dict: The dictionary to hash.
+        n_chars: The number of characters to include in the hash.
+
+    Returns:
+        The hash of the dictionary.
+    """
+    # Convert the dictionary to a JSON string
+    dict_str = json.dumps(input_dict, sort_keys=True)
+
+    # Generate a SHA-256 hash of the string
+    hash_obj = hashlib.sha256(dict_str.encode())
+
+    # Get the first 8 characters of the hexadecimal digest
+    hash_str = hash_obj.hexdigest()[:n_chars]
+
+    return hash_str
+
+
+def iupac2smiles(iupac: str) -> Optional[str]:
+    """
+    Convert IUPAC-condensed representations to SMILES strings (or None if the smiles string cannot be valid).
+
+    Args:
+        iupac: The IUPAC-condensed representation of the glycan.
+
+    Returns:
+        The SMILES string representation of the glycan.
+    """
+    if any([x in iupac for x in ["?", "{", "}"]]):
+        return None
+    try:
+        smiles = convert(iupac)[0][1]
+        if len(smiles) < 10:
+            return None
+        return smiles
+    except:
+        return None
+
+
 def get_mods_list(node):
     ids = [0] * 16
     for mod in node["recipe"]:
         if mod != node["name"]:
             ids[mods_map.get(re.sub(r'[^A-Za-z]', '', mod[0]), 0)] = 1
     return ids
-
 
 
 def get_sl_model(
@@ -135,238 +242,5 @@ def get_metrics(
             MatthewsCorrCoef(**metric_args),
             Sensitivity(**metric_args),
         ])
-    return {"train": m.clone(prefix="train/" + prefix), "val": m.clone(prefix="val/" + prefix), "test": m.clone(prefix="test/" + prefix)}
-
-
-def mol2nx(mol: rdkit.Chem.Mol, node: int) -> nx.Graph:
-    """
-    Convert a monosaccharide to a networkx graph.
-
-    Args:
-        The molecule to be converted
-        node: The monosaccharide ID in the whole glycan
-
-    Returns:
-        A networkx.Graph representing the molecule with the same properties
-    """
-    G = nx.Graph()
-
-    # Convert all the atoms, explicit Hs and Hybridization have to be dropped because they interfere with further steps)
-    for atom in mol.GetAtoms():
-        G.add_node(
-            atom.GetIdx(),
-            atomic_num=atom.GetAtomicNum(),
-            formal_charge=atom.GetFormalCharge(),
-            chiral_tag=atom.GetChiralTag(),
-            is_aromatic=atom.GetIsAromatic(),
-            mono_id=node,
-        )
-    # Convert all the bonds
-    for bond in mol.GetBonds():
-        G.add_edge(
-            bond.GetBeginAtomIdx(),
-            bond.GetEndAtomIdx(),
-            bond_type=bond.GetBondType(),
-            mono_id=node,
-        )
-    return G
-
-
-def nx2mol(G: nx.Graph, sanitize=True) -> rdkit.Chem.Mol:
-    """
-    Convert a molecules from a networkx.Graph to RDKit.
-
-    Args:
-        G: The graph representing a molecule
-        sanitize: A bool flag indicating to sanitize the resulting molecule (should be True for "production mode" and
-            False when debugging this function)
-
-    Returns:
-        The converted, sanitized molecules in RDKit represented by the input graph
-    """
-    # Create the molecule
-    mol = Chem.RWMol()
-
-    # Extract the node attributes
-    atomic_nums = nx.get_node_attributes(G, 'atomic_num')
-    chiral_tags = nx.get_node_attributes(G, 'chiral_tag')
-    formal_charges = nx.get_node_attributes(G, 'formal_charge')
-    node_is_aromatics = nx.get_node_attributes(G, 'is_aromatic')
-    mono_ids = nx.get_node_attributes(G, 'mono_id')
-
-    # Create all atoms based on their representing nodes
-    node_to_idx = {}
-    for node in G.nodes():
-        a = Chem.Atom(atomic_nums[node])
-        a.SetChiralTag(chiral_tags[node])
-        a.SetFormalCharge(formal_charges[node])
-        a.SetIsAromatic(node_is_aromatics[node])
-        a.SetIntProp("mono_id", mono_ids[node])
-        idx = mol.AddAtom(a)
-        node_to_idx[node] = idx
-
-    # Extract the edge attributes
-    bond_types = nx.get_edge_attributes(G, 'bond_type')
-    mono_bond_ids = nx.get_edge_attributes(G, 'mono_id')
-
-    # Connect the atoms based on the edges from the graph
-    for edge in G.edges():
-        first, second = edge
-        ifirst = node_to_idx[first]
-        isecond = node_to_idx[second]
-        bond_type = bond_types[first, second]
-        mono_idx = mono_bond_ids[first, second]
-        idx = mol.AddBond(ifirst, isecond, bond_type) - 1
-        mol.GetBondWithIdx(idx).SetIntProp("mono_id", mono_idx)
-
-    # print(Chem.MolToSmiles(mol))
-    if sanitize:
-        Chem.SanitizeMol(mol)
-    return mol
-
-
-def graph_removal(G: nx.Graph, del_node_idx: int) -> nx.Graph:
-    """
-    Remove a node from a graph and reindex the nodes and edges accordingly.
-
-    Args:
-        G: The graph to remove the node from
-        del_node_idx: The index of the node to remove
-
-    Returns:
-        The graph with the node removed and the indices reindexed
-    """
-    H = nx.Graph()
-    for node in G.nodes:
-        if node < del_node_idx:
-            H.add_node(node, **G.nodes[node])
-        elif node > del_node_idx:
-            H.add_node(node - 1, **G.nodes[node])
-    for edge in G.edges:
-        if del_node_idx in edge:
-            continue
-        start, end = edge
-        if start > del_node_idx:
-            start -= 1
-        if end > del_node_idx:
-            end -= 1
-        H.add_edge(start, end, **G.edges[edge])
-    return H
-
-
-def connect_nx(atom: int, child_start: int, kids: nx.Graph, me: nx.Graph, original_atom: int) -> nx.Graph:
-    """
-    Connect a monosaccharide to a glycan.
-
-    Args:
-        atom: Name of the placeholder atom in me
-        child_start: Idx of the atom to connect to (the one to be replaced theoretically) in kids
-        kids: nx object of the children downstream the current connection
-        me: nx object of the monosaccharide to prepend
-        original_atom: The type of the original atom to be replaced in the monosaccharide
-
-    Returns:
-        The merged nx object
-    """
-    me_idx = [k for k, v in nx.get_node_attributes(me, "atomic_num").items() if v == atom][0]
-    anchor_c = list(kids.neighbors(child_start))[0]
-
-    # anchor_p = list(me.neighbors(me_idx))[0]
-    # me.nodes[anchor_p]["atomic_num"] = 32       # Ge
-    # me.nodes[me_idx]["atomic_num"] = 34         # Se
-    # kids.nodes[anchor_c]["atomic_num"] = 50     # Sn
-    # kids.nodes[child_start]["atomic_num"] = 52  # Te
-
-    G = nx.disjoint_union(me, kids)
-
-    # G.add_edge(me_idx, len(me) + child_start, bond_type=BondType.SINGLE, mono_id=nx.get_node_attributes(kids, "mono_id")[child_start])
-
-    G.add_edge(me_idx, len(me) + anchor_c, bond_type=BondType.SINGLE,
-               mono_id=nx.get_node_attributes(kids, "mono_id")[child_start])
-    G.remove_node(len(me) + child_start)
-
-    G.nodes[me_idx]["atomic_num"] = original_atom
-    # print(me_idx)
-    return graph_removal(G, len(me) + child_start)
-
-
-class S3NMerger(Merger):
-    def merge(self, t, root_orientation: str = "n", start: int = 100) -> nx.Graph:
-        """
-        Merge a tree into a single molecule.
-
-        Args:
-            t: Tree representing the glycan to compute the whole SMILES representation for
-            root_orientation: The orientation of the root monomer
-            start: The starting index for the molecule
-
-        Returns:
-            The merged molecule
-        """
-        # first mark the atoms that will be replaced in a binding of two monomers
-        self.__mark(t, 0, f"({root_orientation}1-?)")
-        # then merge the tree into a single molecule
-        return self.__merge(t, 0, 0)
-
-    def __mark(self, t: nx.Graph, node: int, p_edge: Optional[str] = None):
-        """
-        Recursively mark in every node of the molecule which atoms are being replaced by bound monomers.
-
-        Args:
-            t (networkx.DiGraph): Tree representing the glycan to compute the whole SMILES representation for.
-            node (int): ID of the node to work on in this method
-            p_edge (str): edge annotation to parent monomer
-
-        Returns:
-            Nothing
-        """
-        # get children nodes
-        children = [x[1] for x in t.edges(node)]
-
-        # set chirality of atom binding parent
-        if p_edge is not None and t.nodes[node]["type"].is_non_chiral():
-            t.nodes[node]["type"] = t.nodes[node]["type"].to_chirality(p_edge[1], self.factory)
-
-        # check for validity of the tree, ie if it's a leaf (return, nothing to do) or has too many children (Error)
-        if len(children) == 0:  # leaf
-            return
-        if len(children) > 4:  # too many children
-            raise NotImplementedError("Glycans with maximal branching factor greater then 3 not implemented.")
-
-        # iterate over the children and the atoms used to mark binding atoms in my structure
-        for child, atom in zip(children, t.nodes[node]["type"].get_dummy_atoms()):
-            binding = re.findall(r'\d+', t.get_edge_data(node, child)["type"])[1]
-
-            t.nodes[node]["type"].mark(int(binding), *atom)
-            self.__mark(t, child, t.get_edge_data(node, child)["type"])
-
-    def __merge(self, t: nx.Graph, node: int, start: int, ring_index: Optional[int] = None):
-        """
-        Recursively merge a tree into a single molecule.
-
-        Args:
-            t: Tree representing the glycan to compute the whole SMILES representation for
-            node: ID of the node to work on in this method
-            start: The starting index for the molecule
-            ring_index: The index of the ring to close
-
-        Returns:
-            The merged molecule
-        """
-        children = [x[1] for x in t.edges(node)]
-        me = mol2nx(t.nodes[node]["type"].structure, node)
-
-        if len(children) == 0:
-            return me
-
-        for child, (o_atom, n_atom) in zip(children, t.nodes[node]["type"].get_dummy_atoms()):
-            binding = re.findall(r'\d+', t.get_edge_data(node, child)["type"])[0]
-            child_start = t.nodes[child]["type"].root_atom_id(int(binding))
-
-            # get the SMILES of this child and plug it in the current own SMILES
-            child = self.__merge(t, child, child_start)
-            if o_atom[0] in nx.get_node_attributes(me, "atomic_num").values():
-                me = connect_nx(o_atom[0], child_start, child, me, 8)
-            elif n_atom[0] in nx.get_node_attributes(me, "atomic_num").values():
-                me = connect_nx(n_atom[0], child_start, child, me, 7)
-        return me
+    return {"train": m.clone(prefix="train/" + prefix), "val": m.clone(prefix="val/" + prefix),
+            "test": m.clone(prefix="test/" + prefix)}
