@@ -1,9 +1,15 @@
 import copy
+from pathlib import Path
 from typing import Any, Union, Literal
 
 import torch
+import yaml
 from glycowork.glycan_data.loader import lib
 from glycowork.motif.graph import glycan_to_nxGraph
+
+from gifflar.data import hetero_collate
+from gifflar.model import PretrainGGIN
+
 try:
     from rdkit.Chem import rdFingerprintGenerator
     RDKIT_GEN = True
@@ -387,6 +393,25 @@ class MonosaccharidePrediction(RootTransform):
             data["mods_y"] = torch.tensor([
                 get_mods_list(data["tree"].nodes[x]) for x in range(data["monosacchs"].num_nodes)
             ])
+        return data
+
+
+class GIFFLAREmbed(RootTransform):
+    def __init__(self, hparams_path: str | Path, ckpt_path: str | Path, **kwargs):
+        super(GIFFLAREmbed, self).__init__(**kwargs)
+        with open(hparams_path, "r") as file:
+            config = yaml.load(file, Loader=yaml.FullLoader)
+        self.model = PretrainGGIN(**config, tasks=None, pre_transform_args=kwargs.get("pre-transforms", {}))
+        self.model.load_from_checkpoint(torch.load(ckpt_path)["state_dict"])
+        self.model.eval()
+
+    def __call__(self, data: HeteroData) -> HeteroData:
+        batch = hetero_collate([data])
+        with torch.no_grad():
+            node_embeds = self.model.predict(batch)
+        data["fp"] = torch.cat([
+            node_embeds["atoms"].x, node_embeds["bonds"].x, node_embeds["monosacchs"].x
+        ], dim=0).mean()
         return data
 
 

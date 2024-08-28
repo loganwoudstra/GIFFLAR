@@ -11,7 +11,7 @@ import torch
 from rdkit import Chem, RDLogger
 from rdkit.Chem import rdDepictor
 from torch.utils.data import DataLoader  # has to be these, otherwise collate_fn does not work!
-from torch_geometric.data import InMemoryDataset, HeteroData, Dataset
+from torch_geometric.data import InMemoryDataset, HeteroData
 from pytorch_lightning import LightningDataModule
 import glyles
 from glyles.glycans.factory.factory import MonomerFactory
@@ -192,7 +192,8 @@ def hetero_collate(data: Optional[Union[List[List[HeteroData]], List[HeteroData]
                 tmp_edge_attr.append(d[edge_type].edge_attr)
 
         # Collate the edge information
-        edge_index_dict[edge_type] = torch.cat(tmp_edge_index, dim=1)
+        if len(tmp_edge_index) != 0:
+            edge_index_dict[edge_type] = torch.cat(tmp_edge_index, dim=1)
         if len(tmp_edge_attr) != 0:
             edge_attr_dict[edge_type] = torch.cat(tmp_edge_attr, dim=0)
 

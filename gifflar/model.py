@@ -1,3 +1,4 @@
+import copy
 from typing import List, Literal, Dict, Optional, Any
 
 from glycowork.glycan_data.loader import lib
@@ -7,6 +8,7 @@ from torch import nn
 from torch_geometric.data import HeteroData
 from torch_geometric.nn import GINConv, HeteroConv, global_mean_pool
 
+from gifflar.data import HeteroDataBatch
 from gifflar.loss import MultiLoss
 from gifflar.pretransforms import RandomWalkPE, LaplacianPE
 from gifflar.utils import atom_map, bond_map, get_metrics, mono_map
@@ -143,7 +145,7 @@ class GlycanGIN(LightningModule):
 
         self.batch_size = batch_size
 
-    def forward(self, batch: HeteroData) -> torch.Tensor:
+    def forward(self, batch: HeteroDataBatch) -> torch.Tensor:
         """
         Forward pass of the model.
 
@@ -211,7 +213,7 @@ class GlycanGIN(LightningModule):
 
 
 class PretrainGGIN(GlycanGIN):
-    def __init__(self, hidden_dim: int, tasks: list[dict[str, Any]], num_layers: int = 3, batch_size: int = 32,
+    def __init__(self, hidden_dim: int, tasks: list[dict[str, Any]] | None, num_layers: int = 3, batch_size: int = 32,
                  pre_transform_args: Optional[Dict] = None, **kwargs):
         """
         Initialize the PretrainGGIN model, a pre-training model for downstream tasks.
@@ -268,7 +270,7 @@ class PretrainGGIN(GlycanGIN):
 
         return super().to(device)
 
-    def forward(self, batch: HeteroData) -> dict:
+    def forward(self, batch: HeteroDataBatch) -> dict:
         """
         Forward pass of the model.
 
@@ -291,16 +293,38 @@ class PretrainGGIN(GlycanGIN):
             "mods_preds": mods_preds,
         }
 
-    def shared_step(self, batch: HeteroData, stage: Literal["train", "val", "test"]) -> dict:
-        fwd_dict = self.forward(batch)
+    def predict_step(self, batch: HeteroDataBatch) -> dict:
+        """
+        Predict the output of the model and return the node embeddings from all layers
 
-        # print(self.mono_pred_head)
-        # print(type(self.mono_pred_loss))
-        # print(fwd_dict["mono_preds"])
-        # print(batch["bonds_y"])
-        # print(batch["mono_y"])
-        # print(torch.tensor(batch["mono_y"]).reshape(fwd_dict["mono_preds"].shape[:-1]))
-        # print(torch.tensor(batch["mono_y"]).reshape(fwd_dict["mono_preds"].shape[:-1]).shape)
+        Args:
+            batch: The batch of data to process
+
+        Returns:
+            A dictionary containing:
+                node_embeds: The node embeddings from all layers
+        """
+
+        for key in batch.x_dict.keys():
+            # Compute random encodings for the atom type and include positional encodings
+            pes = [self.embedding.forward(batch.x_dict[key], key)]
+            for pe in self.addendum:
+                pes.append(batch[f"{key}_{pe}"])
+
+            batch.x_dict[key] = torch.concat(pes, dim=1)
+
+        node_embeds = []
+        for conv in self.convs:
+            if isinstance(conv, HeteroConv):
+                batch.x_dict = conv(batch.x_dict, batch.edge_index_dict)
+                node_embeds.append(copy.deepcopy(batch.x_dict))
+            else:  # the layer is an activation function from the RGCN
+                batch.x_dict = conv(batch.x_dict)
+
+        return {"node_embeds": node_embeds}
+
+    def shared_step(self, batch: HeteroDataBatch, stage: Literal["train", "val", "test"]) -> dict:
+        fwd_dict = self.forward(batch)
 
         fwd_dict["atom_loss"] = self.atom_mask_loss(fwd_dict["atom_preds"], batch["atoms_y"] - 1)
         fwd_dict["bond_loss"] = self.bond_mask_loss(fwd_dict["bond_preds"], batch["bonds_y"] - 1)
@@ -399,7 +423,7 @@ class DownstreamGGIN(GlycanGIN):
             self.metrics[split] = metric.to(device)
         return self
 
-    def forward(self, batch):
+    def forward(self, batch: HeteroDataBatch) -> dict:
         """
         Forward pass of the model.
 
