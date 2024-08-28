@@ -20,5 +20,5 @@ model:
   epochs: 100
   learning_rate: 0.001
   optimizer: Adam
-  loss: static
-  suffix: _stat
+  loss: dynamic
+  suffix: _dyn_re

@@ -1,7 +1,7 @@
 seed: 42
 data_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/
 root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_self
-logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_feat
+logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs
 datasets:
   - name: Immunogenicity
     task: classification
@@ -30,7 +30,7 @@ pre-transforms:
     dim: 20
 model:
   - name: rgcn
-    feat_dim: 128
+    feat_dim: 1024
     hidden_dim: 1024
     batch_size: 256
     num_layers: 8
