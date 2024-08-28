@@ -246,7 +246,7 @@ def hash_dict(input_dict: dict, n_chars: int = 8) -> str:
 def main(config):
     custom_args = read_yaml_config(config)
     custom_args["hash"] = hash_dict(custom_args["pre-transforms"])
-    if "data_dir" in custom_args:
+    if "root_dir" in custom_args:
         for args in unfold_config(custom_args):
             #try:
             print(args)

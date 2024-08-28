@@ -8,6 +8,7 @@ from torch import nn
 from torch_geometric.data import HeteroData
 from torch_geometric.nn import GINConv, HeteroConv, global_mean_pool
 
+from gifflar.data import HeteroDataBatch
 from gifflar.loss import MultiLoss
 from gifflar.pretransforms import RandomWalkPE, LaplacianPE
 from gifflar.utils import atom_map, bond_map, get_metrics, mono_map
@@ -144,7 +145,7 @@ class GlycanGIN(LightningModule):
 
         self.batch_size = batch_size
 
-    def forward(self, batch: HeteroData) -> torch.Tensor:
+    def forward(self, batch: HeteroDataBatch) -> torch.Tensor:
         """
         Forward pass of the model.
 
@@ -212,7 +213,7 @@ class GlycanGIN(LightningModule):
 
 
 class PretrainGGIN(GlycanGIN):
-    def __init__(self, hidden_dim: int, tasks: list[dict[str, Any]], num_layers: int = 3, batch_size: int = 32,
+    def __init__(self, hidden_dim: int, tasks: list[dict[str, Any]] | None, num_layers: int = 3, batch_size: int = 32,
                  pre_transform_args: Optional[Dict] = None, **kwargs):
         """
         Initialize the PretrainGGIN model, a pre-training model for downstream tasks.
@@ -269,7 +270,7 @@ class PretrainGGIN(GlycanGIN):
 
         return super().to(device)
 
-    def forward(self, batch: HeteroData) -> dict:
+    def forward(self, batch: HeteroDataBatch) -> dict:
         """
         Forward pass of the model.
 
@@ -292,7 +293,7 @@ class PretrainGGIN(GlycanGIN):
             "mods_preds": mods_preds,
         }
 
-    def predict_step(self, batch: HeteroData) -> dict:
+    def predict_step(self, batch: HeteroDataBatch) -> dict:
         """
         Predict the output of the model and return the node embeddings from all layers
 
@@ -322,7 +323,7 @@ class PretrainGGIN(GlycanGIN):
 
         return {"node_embeds": node_embeds}
 
-    def shared_step(self, batch: HeteroData, stage: Literal["train", "val", "test"]) -> dict:
+    def shared_step(self, batch: HeteroDataBatch, stage: Literal["train", "val", "test"]) -> dict:
         fwd_dict = self.forward(batch)
 
         fwd_dict["atom_loss"] = self.atom_mask_loss(fwd_dict["atom_preds"], batch["atoms_y"] - 1)
@@ -422,7 +423,7 @@ class DownstreamGGIN(GlycanGIN):
             self.metrics[split] = metric.to(device)
         return self
 
-    def forward(self, batch):
+    def forward(self, batch: HeteroDataBatch) -> dict:
         """
         Forward pass of the model.
 
