@@ -1,9 +1,9 @@
 from typing import Literal
 
+import torch
 from torch import nn
-from torch_geometric.nn import GINConv
+from torch_geometric.nn import GINConv, global_mean_pool
 
-from gifflar.pretransforms import RandomWalkPE, LaplacianPE
 from gifflar.utils import get_metrics
 
 
@@ -56,12 +56,6 @@ def get_prediction_head(input_dim: int, num_predictions: int,
     return head, loss, metrics
 
 
-pre_transforms = {
-    "LaplacianPE": LaplacianPE,
-    "RandomWalkPE": RandomWalkPE,
-}
-
-
 class MultiEmbedding(nn.Module):
     """Class storing multiple embeddings in a dict-format and allowing for training them as nn.Module"""
 
@@ -85,3 +79,34 @@ class MultiEmbedding(nn.Module):
             name: The name of the embedding to use
         """
         return getattr(self, name).forward(input_)
+
+
+class GIFFLARPooling(nn.Module):
+    """Class to perform pooling on the output of the GIFFLAR model"""
+
+    def __init__(self, mode: str = "global_mean"):
+        """
+        Initialize the GIFFLARPooling class
+
+        Args:
+            input_dim: The input dimension of the pooling layer
+            output_dim: The output dimension of the pooling layer
+        """
+        super().__init__()
+        match(mode):
+            case "global_mean":
+                self.pooling = global_mean_pool
+            case _:
+                raise ValueError(f"Pooling mode {mode} not implemented yet.")
+
+    def forward(self, nodes: dict[str, torch.Tensor], batch_ids: dict[str, torch.Tensor]) -> torch.Tensor:
+        """
+        Perform pooling on the input
+
+        Args:
+            x: The input to the pooling layer
+        """
+        return self.pooling(
+            torch.concat([nodes["atoms"], nodes["bonds"], nodes["monosacchs"]], dim=0),
+            torch.concat([batch_ids["atoms"], batch_ids["bonds"], batch_ids["monosacchs"]], dim=0)
+        )

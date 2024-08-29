@@ -3,6 +3,7 @@ from typing import Optional, Callable, Any
 
 import torch
 from pytorch_lightning import LightningDataModule
+from torch.utils.data import ConcatDataset
 from torch_geometric.data import DataLoader
 
 from gifflar.data.datasets import DownstreamGDs, PretrainGDs
@@ -49,6 +50,17 @@ class GlycanDataModule(LightningDataModule):
             DataLoader for the test data
         """
         return DataLoader(self.test, batch_size=min(self.batch_size, len(self.test)), shuffle=False,
+                          collate_fn=hetero_collate, num_workers=16)
+
+    def predict_dataloader(self) -> DataLoader:
+        """
+        Return the DataLoader for the prediction data.
+
+        Returns:
+            DataLoader for the prediction data
+        """
+        predict = ConcatDataset([self.train, self.val, self.test])
+        return DataLoader(predict, batch_size=min(self.batch_size, len(predict)), shuffle=False,
                           collate_fn=hetero_collate, num_workers=16)
 
 

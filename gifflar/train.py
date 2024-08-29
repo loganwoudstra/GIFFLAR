@@ -1,6 +1,8 @@
+from pathlib import Path
 from typing import Any
 
 import torch
+import yaml
 from jsonargparse import ArgumentParser
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import RichProgressBar, RichModelSummary, ModelCheckpoint
@@ -15,9 +17,12 @@ from gifflar.model.baselines.sweetnet import SweetNetLightning
 from gifflar.benchmarks import get_dataset
 from gifflar.model.downstream import DownstreamGGIN
 from gifflar.model.pretrain import PretrainGGIN
-from gifflar.pretransforms import get_pretransforms
+from gifflar.pretransforms import get_pretransforms, LaplacianPE, RandomWalkPE
 from gifflar.transforms import get_transforms
 from gifflar.utils import get_sl_model, get_metrics, read_yaml_config, hash_dict, unfold_config
+
+
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 MODELS = {
     "gifflar": DownstreamGGIN,
@@ -27,12 +32,12 @@ MODELS = {
     "sweetnet": SweetNetLightning,
 }
 
-
-def setup(**kwargs: Any) -> tuple[dict, DownsteamGDM, Logger, dict]:
+def setup(count: int = 4, **kwargs: Any) -> tuple[dict, DownsteamGDM, Logger | None, dict | None]:
     """
     Set up the training environment.
 
     Params:
+        count: The number of outputs needed.
         kwargs: The configuration for the training.
 
     Returns:
@@ -52,10 +57,16 @@ def setup(**kwargs: Any) -> tuple[dict, DownsteamGDM, Logger, dict]:
     )
     data_config["num_classes"] = datamodule.train.dataset_args["num_classes"]
 
+    if count == 2:
+        return data_config, datamodule, None, None
+
     # set up the logger
     logger = CSVLogger(kwargs["logs_dir"], name=kwargs["model"]["name"] + (kwargs["model"].get("suffix", None) or ""))
     kwargs["dataset"]["filepath"] = str(data_config["filepath"])
     logger.log_hyperparams(kwargs)
+
+    if count == 3:
+        return data_config, datamodule, logger, None
 
     # set up the metrics
     metrics = get_metrics(data_config["task"], data_config["num_classes"])
@@ -121,7 +132,7 @@ def train(**kwargs: Any) -> None:
     Params:
         kwargs: The configuration for the training.
     """
-    data_config, datamodule, logger, _ = setup(**kwargs)
+    data_config, datamodule, logger, _ = setup(3, **kwargs)
     model = MODELS[kwargs["model"]["name"]](output_dim=data_config["num_classes"], task=data_config["task"],
                                             pre_transform_args=kwargs["pre-transforms"], **kwargs["model"])
     trainer = Trainer(
@@ -166,6 +177,38 @@ def pretrain(**kwargs: Any) -> None:
     trainer.fit(model, datamodule)
 
 
+def embed(prep_args: dict[str, str], **kwargs: Any):
+    """
+    Embed the data using a pretrained model.
+
+    Params:
+        prep_args: The configuration for the pretraining.
+            model_name: The name of the model.
+            hparams_path: The path to the hyperparameters.
+            ckpt_path: The path to the checkpoint.
+            pkl_dir: The directory to save the embeddings.
+        kwargs: The configuration for the training.
+    """
+    output_name = Path(prep_args["save_dir"]) / ("_".join([
+        kwargs["dataset"]["name"],
+        prep_args["model_name"],
+        hash_dict(prep_args, 8),
+    ]) + ".pt")
+    if output_name.exists():
+        return
+
+    with open(prep_args["hparams_path"], "r") as file:
+        config = yaml.load(file, Loader=yaml.FullLoader)
+    model = PretrainGGIN(**config["model"], tasks=None, pre_transform_args=kwargs.get("pre-transforms", {}))
+    model.load_state_dict(torch.load(prep_args["ckpt_path"], map_location=torch.device("cpu"))["state_dict"])
+    model.eval()
+
+    data_config, data, _, _ = setup(2, **kwargs)
+    trainer = Trainer()
+    preds = trainer.predict(model, data.predict_dataloader())
+    torch.save(preds, output_name)
+
+
 def main(config):
     custom_args = read_yaml_config(config)
     custom_args["hash"] = hash_dict(custom_args["pre-transforms"])
@@ -173,6 +216,8 @@ def main(config):
         for args in unfold_config(custom_args):
             #try:
             print(args)
+            if "prepare" in args:
+                args = embed(**args)
             if args["model"]["name"] in ["rf", "svm", "xgb"]:
                 fit(**args)
             else:
@@ -186,6 +231,24 @@ def main(config):
 
 
 if __name__ == '__main__':
+    # embed(
+    #     prep_args={
+    #         "model_name": "GIFFLAR",
+    #         "ckpt_path": "dyn_re_epoch=99-step=6200.ckpt",
+    #         "hparams_path": "hparams.yaml",
+    #         "save_dir": ".",
+    #     },
+    #     **{
+    #         "seed": 42,
+    #         "data_dir": "data",
+    #         "root_dir": ".",
+    #         "logs_dir": "logs",
+    #         "dataset": {"name": "Immunogenicity", "task": "classification"},
+    #         "pre-transforms": {},
+    #         "hash": "12345678",
+    #         "model": {},
+    #     }
+    # )
     parser = ArgumentParser()
     parser.add_argument("config", type=str, help="Path to YAML config file")
     main(parser.parse_args().config)

@@ -1,29 +1,17 @@
 import copy
-from pathlib import Path
 from typing import Any, Union, Literal
 
 import torch
-import yaml
 from glycowork.glycan_data.loader import lib
 from glycowork.motif.graph import glycan_to_nxGraph
-
-from gifflar.data.hetero import hetero_collate
-from gifflar.model.pretrain import PretrainGGIN
-
-try:
-    from rdkit.Chem import rdFingerprintGenerator
-
-    RDKIT_GEN = True
-except ImportError:
-    from rdkit.Chem import AllChem
-
-    RDKIT_GEN = False
+from rdkit.Chem import rdFingerprintGenerator
 from torch_geometric.data import Data, HeteroData
 from torch_geometric.transforms import Compose, AddLaplacianEigenvectorPE
 from torch_geometric.transforms.base_transform import BaseTransform
 from torch_geometric.utils import from_networkx, to_dense_adj
 from tqdm import tqdm
 
+from gifflar.model.utils import GIFFLARPooling
 from gifflar.utils import bond_map, lib_map, atom_map, mono_map, get_mods_list
 
 
@@ -220,8 +208,7 @@ class ECFPTransform(RootTransform):
             kwargs: Additional arguments.
         """
         super().__init__(**kwargs)
-        if RDKIT_GEN:
-            self.ecfp = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=1024)
+        self.ecfp = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=1024)
 
     def __call__(self, data: HeteroData) -> HeteroData:
         """
@@ -234,11 +221,7 @@ class ECFPTransform(RootTransform):
             The transformed data.
         """
         # Check if the RDKit fingerprint generator is available
-        if RDKIT_GEN:
-            data["fp"] = torch.tensor(self.ecfp.GetFingerprint(data["mol"]), dtype=torch.float).reshape(1, -1)
-        else:
-            data["fp"] = torch.tensor(AllChem.GetMorganFingerprintAsBitVect(data["mol"], 2, nBits=1024),
-                                      dtype=torch.float).reshape(1, -1)
+        data["fp"] = torch.tensor(self.ecfp.GetFingerprint(data["mol"]), dtype=torch.float).reshape(1, -1)
         return data
 
 
@@ -424,45 +407,16 @@ class MonosaccharidePrediction(RootTransform):
         return data
 
 
-class GIFFLAREmbed(RootTransform):
+class PretrainEmbed(RootTransform):
     """Run a GIFFLAR model to embed the input data."""
 
-    def __init__(self, hparams_path: str | Path, ckpt_path: str | Path, **kwargs: Any):
-        """
-        Initialize the GIFFLAREmbed transformation.
-
-        Params:
-            hparams_path: The path to the hyperparameters file.
-            ckpt_path: The path to the checkpoint file.
-            kwargs: Additional arguments.
-        """
-        super(GIFFLAREmbed, self).__init__(**kwargs)
-        with open(hparams_path, "r") as file:
-            config = yaml.load(file, Loader=yaml.FullLoader)
-        self.model = PretrainGGIN(**config, tasks=None, pre_transform_args=kwargs.get("pre-transforms", {}))
-        self.model.load_from_checkpoint(torch.load(ckpt_path)["state_dict"])
-        self.model.eval()
+    def __init__(self, file_path: str, **kwargs: Any):
+        super(PretrainEmbed, self).__init__(**kwargs)
+        self.node_embeds = torch.load(file_path)
+        self.pooling = GIFFLARPooling()
 
     def __call__(self, data: HeteroData) -> HeteroData:
-        """
-        Embed the input data using the GIFFLAR model.
-
-        Params:
-            data: The input data to be transformed.
-
-        Returns:
-            The transformed data.
-        """
-        # Turn the data into a batch and compute the node embeddings
-        batch = hetero_collate([data])
-        with torch.no_grad():
-            node_embeds = self.model.predict(batch)
-
-        # Compute the graph embedding based on the node embeddings
-        data["fp"] = torch.cat([
-            node_embeds["atoms"].x, node_embeds["bonds"].x, node_embeds["monosacchs"].x
-        ], dim=0).mean()
-        return data
+        pass
 
 
 class TQDMCompose(Compose):
@@ -504,10 +458,16 @@ def get_pretransforms(**pre_transform_args) -> TQDMCompose:
         RGCNTransform(),
     ]
     for name, args in pre_transform_args.items():
-        if name == "LaplacianPE":
-            pre_transforms.append(LaplacianPE(**args))
-        if name == "RandomWalkPE":
-            pre_transforms.append(RandomWalkPE(**args))
-        if name == "MonosaccharidePrediction":
-            pre_transforms.append(MonosaccharidePrediction(**args))
+        match(name):
+            case "LaplacianPE":
+                pre_transforms.append(LaplacianPE(**args))
+            case "RandomWalkPE":
+                pre_transforms.append(RandomWalkPE(**args))
+            case "MonosaccharidePrediction":
+                pre_transforms.append(MonosaccharidePrediction(**args))
+            case "PretrainEmbed":
+                pre_transforms.append(PretrainEmbed(**args))
+            case _:
+                pass
+
     return TQDMCompose(pre_transforms)

@@ -7,6 +7,7 @@ from torch_geometric.nn import global_mean_pool
 
 from gifflar.data.hetero import HeteroDataBatch
 from gifflar.model.base import GlycanGIN
+from gifflar.model.utils import GIFFLARPooling
 from gifflar.utils import get_metrics
 
 
@@ -28,7 +29,7 @@ class DownstreamGGIN(GlycanGIN):
         super().__init__(kwargs["feat_dim"], hidden_dim, num_layers, batch_size, pre_transform_args)
         self.output_dim = output_dim
 
-        self.pooling = global_mean_pool
+        self.pooling = GIFFLARPooling()
         self.task = task
 
         # Define the classification head of the model
@@ -82,10 +83,7 @@ class DownstreamGGIN(GlycanGIN):
                 preds: The predictions of the model
         """
         node_embed = super().forward(batch)
-        graph_embed = self.pooling(
-            torch.concat([node_embed["atoms"], node_embed["bonds"], node_embed["monosacchs"]], dim=0),
-            torch.concat([batch.batch_dict["atoms"], batch.batch_dict["bonds"], batch.batch_dict["monosacchs"]], dim=0)
-        )
+        graph_embed = self.pooling(node_embed, batch.batch_dict)
         pred = self.head(graph_embed)
         return {
             "node_embed": node_embed,

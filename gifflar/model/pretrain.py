@@ -115,6 +115,10 @@ class PretrainGGIN(GlycanGIN):
         node_embeds = []
         for conv in self.convs:
             if isinstance(conv, HeteroConv):
+                for key in batch.x_dict:
+                    print(key, batch.x_dict[key].shape)
+                for key in batch.edge_index_dict:
+                    print(key, batch.edge_index_dict[key].shape)
                 batch.x_dict = conv(batch.x_dict, batch.edge_index_dict)
                 node_embeds.append(copy.deepcopy(batch.x_dict))
             else:  # the layer is an activation function from the RGCN

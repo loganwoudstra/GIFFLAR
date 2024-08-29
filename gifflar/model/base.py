@@ -1,15 +1,22 @@
 from typing import Literal, Optional, Dict
 
 import torch
-from glycowork.glycowork import lib
+from glycowork.glycan_data.loader import lib
 from pytorch_lightning import LightningModule
 from torch import nn
 from torch_geometric.data import HeteroData
 from torch_geometric.nn import HeteroConv
 
 from gifflar.data.hetero import HeteroDataBatch
-from gifflar.model.utils import pre_transforms, MultiEmbedding, get_gin_layer
+from gifflar.model.utils import MultiEmbedding, get_gin_layer
+from gifflar.pretransforms import LaplacianPE, RandomWalkPE
 from gifflar.utils import bond_map, atom_map
+
+
+PRE_TRANSFORMS = {
+    "LaplacianPE": LaplacianPE,
+    "RandomWalkPE": RandomWalkPE,
+}
 
 
 class GlycanGIN(LightningModule):
@@ -31,8 +38,8 @@ class GlycanGIN(LightningModule):
         self.addendum = []
         if pre_transform_args is not None:
             for name, args in pre_transform_args.items():
-                if name in pre_transforms:
-                    self.addendum.append(pre_transforms[name].attr_name)
+                if name in PRE_TRANSFORMS:
+                    self.addendum.append(PRE_TRANSFORMS[name].attr_name)
                     rand_dim -= args["dim"]
 
         # Set up the learnable embeddings for all node types
@@ -63,16 +70,15 @@ class GlycanGIN(LightningModule):
 
         self.batch_size = batch_size
 
-    def forward(self, batch: HeteroDataBatch) -> torch.Tensor:
+    def forward(self, batch: HeteroDataBatch) -> dict[str, torch.Tensor]:
         """
-        Forward pass of the model.
+        Compute the node embeddings.
 
         Args:
             batch: The batch of data to process
 
         Returns:
             node_embed: The node embeddings
-            graph_embed: The graph embeddings
         """
         for key in batch.x_dict.keys():
             # Compute random encodings for the atom type and include positional encodings
