@@ -3,8 +3,7 @@ from typing import Optional, Callable, Any
 
 import torch
 from pytorch_lightning import LightningDataModule
-from torch.utils.data import ConcatDataset
-from torch_geometric.data import DataLoader
+from torch.utils.data import ConcatDataset, DataLoader
 
 from gifflar.data.datasets import DownstreamGDs, PretrainGDs
 from gifflar.data.hetero import hetero_collate

@@ -173,7 +173,6 @@ def pretrain(**kwargs: Any) -> None:
         max_epochs=kwargs["model"]["epochs"],
         logger=logger,
     )
-    print(transforms)
     trainer.fit(model, datamodule)
 
 
@@ -231,24 +230,24 @@ def main(config):
 
 
 if __name__ == '__main__':
-    # embed(
-    #     prep_args={
-    #         "model_name": "GIFFLAR",
-    #         "ckpt_path": "dyn_re_epoch=99-step=6200.ckpt",
-    #         "hparams_path": "hparams.yaml",
-    #         "save_dir": ".",
-    #     },
-    #     **{
-    #         "seed": 42,
-    #         "data_dir": "data",
-    #         "root_dir": ".",
-    #         "logs_dir": "logs",
-    #         "dataset": {"name": "Immunogenicity", "task": "classification"},
-    #         "pre-transforms": {},
-    #         "hash": "12345678",
-    #         "model": {},
-    #     }
-    # )
-    parser = ArgumentParser()
-    parser.add_argument("config", type=str, help="Path to YAML config file")
-    main(parser.parse_args().config)
+    embed(
+        prep_args={
+            "model_name": "GIFFLAR",
+            "ckpt_path": "dyn_re_epoch=99-step=6200.ckpt",
+            "hparams_path": "hparams.yaml",
+            "save_dir": ".",
+        },
+        **{
+            "seed": 42,
+            "data_dir": "data",
+            "root_dir": ".",
+            "logs_dir": "logs",
+            "dataset": {"name": "Immunogenicity", "task": "classification"},
+            "pre-transforms": {},
+            "hash": "12345678",
+            "model": {},
+        }
+    )
+    # parser = ArgumentParser()
+    # parser.add_argument("config", type=str, help="Path to YAML config file")
+    # main(parser.parse_args().config)
