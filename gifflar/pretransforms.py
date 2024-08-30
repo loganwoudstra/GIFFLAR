@@ -1,4 +1,5 @@
 import copy
+from pathlib import Path
 from typing import Any, Union, Literal
 
 import torch
@@ -410,13 +411,20 @@ class MonosaccharidePrediction(RootTransform):
 class PretrainEmbed(RootTransform):
     """Run a GIFFLAR model to embed the input data."""
 
-    def __init__(self, file_path: str, **kwargs: Any):
+    def __init__(self, folder: str, dataset_name: str, model_name: str, hash_str: str, **kwargs: Any):
         super(PretrainEmbed, self).__init__(**kwargs)
-        self.node_embeds = torch.load(file_path)
+        self.data = torch.load(Path(folder) / f"{dataset_name}_{model_name}_{hash_str}.pt")
+        self.lookup = {smiles: (i, j) for i in range(len(self.data)) for j, smiles in enumerate(self.data[i])}
         self.pooling = GIFFLARPooling()
+        self.layer = kwargs.get("layer", -1)
 
     def __call__(self, data: HeteroData) -> HeteroData:
-        pass
+        a, b = self.lookup[data["smiles"]]
+        mask = {key: self.data[a]["batch_ids"][key] == b for key in ["atoms", "bonds", "monosacchs"]}
+        node_embeds = {key: self.data[a]["node_embeds"][self.layer][mask[key]] for key in ["atoms", "bonds", "monosacchs"]}
+        batch_ids = {key: torch.zeros_like(node_embeds[key], dtype=torch.long) for key in ["atoms", "bonds", "monosacchs"]}
+        data["fp"] = self.pooling(node_embeds, batch_ids)
+        return data
 
 
 class TQDMCompose(Compose):
@@ -440,11 +448,12 @@ class TQDMCompose(Compose):
         return data
 
 
-def get_pretransforms(**pre_transform_args) -> TQDMCompose:
+def get_pretransforms(dataset_name, **pre_transform_args) -> TQDMCompose:
     """
     Calculate the list of pre-transforms to be applied to the data.
 
     Args:
+        dataset_name: The name of the dataset currently being used.
         pre_transform_args: The arguments for the pre-transforms.
 
     Returns:
@@ -466,7 +475,7 @@ def get_pretransforms(**pre_transform_args) -> TQDMCompose:
             case "MonosaccharidePrediction":
                 pre_transforms.append(MonosaccharidePrediction(**args))
             case "PretrainEmbed":
-                pre_transforms.append(PretrainEmbed(**args))
+                pre_transforms.append(PretrainEmbed(dataset_name=dataset_name, **args))
             case _:
                 pass
 

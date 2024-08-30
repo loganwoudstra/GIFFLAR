@@ -53,7 +53,7 @@ def setup(count: int = 4, **kwargs: Any) -> tuple[dict, DownsteamGDM, Logger | N
     datamodule = DownsteamGDM(
         root=kwargs["root_dir"], filename=data_config["filepath"], hash_code=kwargs["hash"],
         batch_size=kwargs["model"].get("batch_size", 1), transform=None,
-        pre_transform=get_pretransforms(**(kwargs["pre-transforms"] or {})), **data_config,
+        pre_transform=get_pretransforms(data_config["name"], **(kwargs["pre-transforms"] or {})), **data_config,
     )
     data_config["num_classes"] = datamodule.train.dataset_args["num_classes"]
 
