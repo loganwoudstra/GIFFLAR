@@ -414,15 +414,20 @@ class PretrainEmbed(RootTransform):
     def __init__(self, folder: str, dataset_name: str, model_name: str, hash_str: str, **kwargs: Any):
         super(PretrainEmbed, self).__init__(**kwargs)
         self.data = torch.load(Path(folder) / f"{dataset_name}_{model_name}_{hash_str}.pt")
-        self.lookup = {smiles: (i, j) for i in range(len(self.data)) for j, smiles in enumerate(self.data[i])}
+        self.lookup = {smiles: (i, j) for i in range(len(self.data)) for j, smiles in enumerate(self.data[i]["smiles"])}
         self.pooling = GIFFLARPooling()
         self.layer = kwargs.get("layer", -1)
 
     def __call__(self, data: HeteroData) -> HeteroData:
+        if data["smiles"] not in self.lookup:
+            print(data["smiles"], "not found in preprocessed data.")
+            data["fp"] = torch.zeros_like(data["fp"])
+            return data
+
         a, b = self.lookup[data["smiles"]]
         mask = {key: self.data[a]["batch_ids"][key] == b for key in ["atoms", "bonds", "monosacchs"]}
-        node_embeds = {key: self.data[a]["node_embeds"][self.layer][mask[key]] for key in ["atoms", "bonds", "monosacchs"]}
-        batch_ids = {key: torch.zeros_like(node_embeds[key], dtype=torch.long) for key in ["atoms", "bonds", "monosacchs"]}
+        node_embeds = {key: self.data[a]["node_embeds"][self.layer][key][mask[key]] for key in ["atoms", "bonds", "monosacchs"]}
+        batch_ids = {key: torch.zeros(len(node_embeds[key]), dtype=torch.long) for key in ["atoms", "bonds", "monosacchs"]}
         data["fp"] = self.pooling(node_embeds, batch_ids)
         return data
 

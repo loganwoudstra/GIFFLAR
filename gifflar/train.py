@@ -232,24 +232,25 @@ def main(config):
 
 
 if __name__ == '__main__':
-    embed(
-        prep_args={
-            "model_name": "GIFFLAR",
-            "ckpt_path": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret/gifflar_dyn_re_pretrain/version_0/checkpoints/epoch=99-step=6200.ckpt",
-            "hparams_path": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret/gifflar_dyn_re_pretrain/version_0/hparams.yaml",
-            "save_dir":"/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_embed/",
-        },
-        **{
-            "seed": 42,
-            "data_dir": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/",
-            "root_dir": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_embed",
-            "logs_dir": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_embed",
-            "dataset": {"name": "Immunogenicity", "task": "classification"},
-            "pre-transforms": {},
-            "hash": "12345678",
-            "model": {},
-        }
-    )
-    # parser = ArgumentParser()
-    # parser.add_argument("config", type=str, help="Path to YAML config file")
-    # main(parser.parse_args().config)
+    #embed(
+    #    prep_args={
+    #        "model_name": "GIFFLAR",
+    #        "ckpt_path": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret/gifflar_dyn_re_pretrain/version_0/checkpoints/epoch=99-step=6200.ckpt",
+    #        "hparams_path": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret/gifflar_dyn_re_pretrain/version_0/hparams.yaml",
+    #        "save_dir":"/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_embed/",
+    #    },
+    #    **{
+    #        "seed": 42,
+    #        "data_dir": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/",
+    #        "root_dir": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_embed",
+    #        "logs_dir": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_embed",
+    #        "dataset": {"name": "Immunogenicity", "task": "classification"},
+    #        "pre-transforms": {},
+    #        "hash": "12345678",
+    #        "model": {},
+    #    }
+    #)
+    parser = ArgumentParser()
+    parser.add_argument("config", type=str, help="Path to YAML config file")
+    main(parser.parse_args().config)
+

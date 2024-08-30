@@ -25,11 +25,12 @@ datasets:
 #    task: multilabel
 pre-transforms:
   PretrainEmbed:
-    file_path: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_embed/
+    folder: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_embed/
     model_name: GIFFLAR
     hash_str: 3fd297ab
 model:
   - name: mlp
+    feat_dim: 1024
     hidden_dim: 1024
     batch_size: 256
     num_layers: 3
