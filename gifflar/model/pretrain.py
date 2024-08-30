@@ -120,7 +120,7 @@ class PretrainGGIN(GlycanGIN):
             else:  # the layer is an activation function from the RGCN
                 batch.x_dict = conv(batch.x_dict)
 
-        return {"node_embeds": node_embeds}
+        return {"node_embeds": node_embeds, "batch_ids": batch.batch_dict, "smiles": batch["smiles"]}
 
     def shared_step(self, batch: HeteroDataBatch, stage: Literal["train", "val", "test"]) -> dict:
         fwd_dict = self.forward(batch)

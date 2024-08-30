@@ -205,6 +205,8 @@ def embed(prep_args: dict[str, str], **kwargs: Any):
     data_config, data, _, _ = setup(2, **kwargs)
     trainer = Trainer()
     preds = trainer.predict(model, data.predict_dataloader())
+    # for d in data.predict_dataloader():
+    #     print(len(d["smiles"]))
     torch.save(preds, output_name)
 
 
@@ -233,15 +235,15 @@ if __name__ == '__main__':
     embed(
         prep_args={
             "model_name": "GIFFLAR",
-            "ckpt_path": "dyn_re_epoch=99-step=6200.ckpt",
-            "hparams_path": "hparams.yaml",
-            "save_dir": ".",
+            "ckpt_path": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret/gifflar_dyn_re_pretrain/version_0/checkpoints/epoch=99-step=6200.ckpt",
+            "hparams_path": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret/gifflar_dyn_re_pretrain/version_0/hparams.yaml",
+            "save_dir":"/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_embed/",
         },
         **{
             "seed": 42,
-            "data_dir": "data",
-            "root_dir": ".",
-            "logs_dir": "logs",
+            "data_dir": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/",
+            "root_dir": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_embed",
+            "logs_dir": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_embed",
             "dataset": {"name": "Immunogenicity", "task": "classification"},
             "pre-transforms": {},
             "hash": "12345678",

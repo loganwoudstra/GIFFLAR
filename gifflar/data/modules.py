@@ -59,6 +59,8 @@ class GlycanDataModule(LightningDataModule):
             DataLoader for the prediction data
         """
         predict = ConcatDataset([self.train, self.val, self.test])
+        self.batch_size = 4
+        print("Batch-Size:", min(self.batch_size, len(predict)))
         return DataLoader(predict, batch_size=min(self.batch_size, len(predict)), shuffle=False,
                           collate_fn=hetero_collate, num_workers=16)
 
