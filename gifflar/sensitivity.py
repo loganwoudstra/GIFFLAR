@@ -10,6 +10,7 @@ from torchmetrics.utilities.enums import ClassificationTask
 
 class BinarySensitivity(BinaryConfusionMatrix):
     """Computes sensitivity for binary classification tasks."""
+
     def compute(self) -> Tensor:
         """Computes the sensitivity."""
         confmat = super().compute().nan_to_num(0, 0, 0)
@@ -19,6 +20,7 @@ class BinarySensitivity(BinaryConfusionMatrix):
 
 class MulticlassSensitivity(MulticlassConfusionMatrix):
     """Computes sensitivity for multiclass classification tasks."""
+
     def compute(self) -> Tensor:
         """Computes the sensitivity as mean per-class sensitivity."""
         confmat = super().compute().nan_to_num(0, 0, 0)
@@ -28,6 +30,7 @@ class MulticlassSensitivity(MulticlassConfusionMatrix):
 
 class MultilabelSensitivity(MultilabelConfusionMatrix):
     """Computes sensitivity for multilabel classification tasks."""
+
     def compute(self) -> Tensor:
         """Computes the sensitivity as mean per-class sensitivity"""
         confmat = super().compute().nan_to_num(0, 0, 0)
@@ -37,15 +40,15 @@ class MultilabelSensitivity(MultilabelConfusionMatrix):
 
 class Sensitivity(_ClassificationTaskWrapper):
     def __new__(
-        cls: Type["Sensitivity"],
-        task: Literal["binary", "multiclass", "multilabel"],
-        threshold: float = 0.5,
-        num_classes: Optional[int] = None,
-        num_labels: Optional[int] = None,
-        normalize: Optional[Literal["true", "pred", "all", "none"]] = None,
-        ignore_index: Optional[int] = None,
-        validate_args: bool = True,
-        **kwargs: Any,
+            cls: Type["Sensitivity"],
+            task: Literal["binary", "multiclass", "multilabel"],
+            threshold: float = 0.5,
+            num_classes: Optional[int] = None,
+            num_labels: Optional[int] = None,
+            normalize: Optional[Literal["true", "pred", "all", "none"]] = None,
+            ignore_index: Optional[int] = None,
+            validate_args: bool = True,
+            **kwargs: Any,
     ) -> Metric:
         """
         Factory method to instantiate the appropriate sensitivity metric based on the task.

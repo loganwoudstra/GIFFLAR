@@ -14,7 +14,7 @@ class HeteroDataBatch:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-    def to(self, device: str):
+    def to(self, device: str) -> "HeteroDataBatch":
         """
         Convert each field to the provided device by iteratively and recursively converting each field.
 

@@ -11,15 +11,19 @@ from gifflar.data.hetero import hetero_collate
 
 class GlycanDataModule(LightningDataModule):
     """DataModule holding datasets for Glycan-specific training"""
-    def __init__(self, batch_size: int = 128, **kwargs: Any):
+
+    def __init__(self, batch_size: int = 128, num_workers: int = 16, **kwargs: Any):
         """
         Initialize the DataModule with a given batch size.
 
         Args:
             batch_size: The batch size to use for training, validation, and testing
+            num_workers: The number of CPUs to use for loading the data
+            **kwargs: Additional arguments to pass to the Data
         """
         super().__init__()
         self.batch_size = batch_size
+        self.num_workers = num_workers
 
     def train_dataloader(self) -> DataLoader:
         """
@@ -28,8 +32,8 @@ class GlycanDataModule(LightningDataModule):
         Returns:
             DataLoader for the training data
         """
-        return DataLoader(self.train, batch_size=min(self.batch_size, len(self.train)), shuffle=True ,
-                          collate_fn=hetero_collate, num_workers=16)
+        return DataLoader(self.train, batch_size=min(self.batch_size, len(self.train)), shuffle=True,
+                          collate_fn=hetero_collate, num_workers=self.num_workers)
 
     def val_dataloader(self) -> DataLoader:
         """
@@ -39,7 +43,7 @@ class GlycanDataModule(LightningDataModule):
             DataLoader for the validation data
         """
         return DataLoader(self.val, batch_size=min(self.batch_size, len(self.val)), shuffle=False,
-                          collate_fn=hetero_collate, num_workers=16)
+                          collate_fn=hetero_collate, num_workers=self.num_workers)
 
     def test_dataloader(self) -> DataLoader:
         """
@@ -49,24 +53,25 @@ class GlycanDataModule(LightningDataModule):
             DataLoader for the test data
         """
         return DataLoader(self.test, batch_size=min(self.batch_size, len(self.test)), shuffle=False,
-                          collate_fn=hetero_collate, num_workers=16)
+                          collate_fn=hetero_collate, num_workers=self.num_workers)
 
     def predict_dataloader(self) -> DataLoader:
         """
-        Return the DataLoader for the prediction data.
+        Combines the train, val, and test datasets and return the DataLoader for that data.
 
         Returns:
-            DataLoader for the prediction data
+            DataLoader for the combined data
         """
         predict = ConcatDataset([self.train, self.val, self.test])
         self.batch_size = 4
         print("Batch-Size:", min(self.batch_size, len(predict)))
         return DataLoader(predict, batch_size=min(self.batch_size, len(predict)), shuffle=False,
-                          collate_fn=hetero_collate, num_workers=16)
+                          collate_fn=hetero_collate, num_workers=self.num_workers)
 
 
 class PretrainGDM(GlycanDataModule):
     """DataModule for pretraining a model on glycan data."""
+
     def __init__(
             self,
             file_path: str | Path,
@@ -99,6 +104,7 @@ class PretrainGDM(GlycanDataModule):
 
 class DownsteamGDM(GlycanDataModule):
     """DataModule for downstream tasks on glycan data."""
+
     def __init__(
             self,
             root: str | Path,
@@ -107,7 +113,7 @@ class DownsteamGDM(GlycanDataModule):
             batch_size: int = 64,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
-            **dataset_args,
+            **dataset_args: dict[str, Any],
     ):
         """
         Initialize the DataModule with the given parameters.

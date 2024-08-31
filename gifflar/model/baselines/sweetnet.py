@@ -11,19 +11,20 @@ from gifflar.model.downstream import DownstreamGGIN
 
 
 class SweetNetLightning(DownstreamGGIN):
-    def __init__(self, hidden_dim: int, output_dim: int, num_layers: int,
+    def __init__(self, feat_dim: int, hidden_dim: int, output_dim: int, num_layers: int,
                  task: Literal["classification", "regression", "multilabel"], **kwargs: Any):
         """
         Embed the SweetNet Model into the pytorch-lightning framework.
 
         Args:
+            feat_dim: The feature dimension of the model.
             hidden_dim: Number of hidden dimensions to use in model.
             output_dim: Number of outputs to produce, usually number of classes/labels/tasks.
             num_layers: Number of graph convolutional layers to use in the model.
             task: What kind of dataset the model is trained on, necessary to select the metrics.
             **kwargs: Additional arguments to pass to the model.
         """
-        super().__init__(hidden_dim, output_dim, task, **kwargs)
+        super().__init__(feat_dim, hidden_dim, output_dim, task, **kwargs)
 
         del self.convs
         del self.head

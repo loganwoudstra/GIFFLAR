@@ -17,7 +17,7 @@ class MultiLoss(nn.Module):
         self.dynamic = dynamic
         self.log_vars = nn.Parameter(torch.full((n_losses,), 1 / n_losses), requires_grad=True)
 
-    def to(self, device: torch.device):
+    def to(self, device: torch.device) -> "MultiLoss":
         """
         Overriding the to method to ensure that the log_vars are also moved to the device.
 
@@ -28,7 +28,8 @@ class MultiLoss(nn.Module):
             The model moved to the device.
         """
         self.log_vars = self.log_vars.to(device)
-        return super().to(device)
+        super().to(device)
+        return self
 
     def forward(self, losses: list[torch.Tensor]) -> torch.Tensor:
         """

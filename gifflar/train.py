@@ -17,10 +17,9 @@ from gifflar.model.baselines.sweetnet import SweetNetLightning
 from gifflar.benchmarks import get_dataset
 from gifflar.model.downstream import DownstreamGGIN
 from gifflar.model.pretrain import PretrainGGIN
-from gifflar.pretransforms import get_pretransforms, LaplacianPE, RandomWalkPE
+from gifflar.pretransforms import get_pretransforms
 from gifflar.transforms import get_transforms
 from gifflar.utils import get_sl_model, get_metrics, read_yaml_config, hash_dict, unfold_config
-
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -31,6 +30,7 @@ MODELS = {
     "rgcn": RGCN,
     "sweetnet": SweetNetLightning,
 }
+
 
 def setup(count: int = 4, **kwargs: Any) -> tuple[dict, DownsteamGDM, Logger | None, dict | None]:
     """
@@ -161,7 +161,8 @@ def pretrain(**kwargs: Any) -> None:
     model = PretrainGGIN(tasks=task_list, pre_transform_args=kwargs["pre-transforms"], **kwargs["model"])
 
     # set up the logger
-    logger = CSVLogger(kwargs["logs_dir"], name=kwargs["model"]["name"] + (kwargs["model"].get("suffix", None) or "") + "_pretrain")
+    logger = CSVLogger(kwargs["logs_dir"],
+                       name=kwargs["model"]["name"] + (kwargs["model"].get("suffix", None) or "") + "_pretrain")
     logger.log_hyperparams(kwargs)
 
     trainer = Trainer(
@@ -176,7 +177,7 @@ def pretrain(**kwargs: Any) -> None:
     trainer.fit(model, datamodule)
 
 
-def embed(prep_args: dict[str, str], **kwargs: Any):
+def embed(prep_args: dict[str, str], **kwargs: Any) -> None:
     """
     Embed the data using a pretrained model.
 
@@ -205,17 +206,15 @@ def embed(prep_args: dict[str, str], **kwargs: Any):
     data_config, data, _, _ = setup(2, **kwargs)
     trainer = Trainer()
     preds = trainer.predict(model, data.predict_dataloader())
-    # for d in data.predict_dataloader():
-    #     print(len(d["smiles"]))
     torch.save(preds, output_name)
 
 
-def main(config):
+def main(config: str | Path) -> None:
+    """Main routine starting (pre-)training and embedding data using a pretrained model."""
     custom_args = read_yaml_config(config)
     custom_args["hash"] = hash_dict(custom_args["pre-transforms"])
     if "root_dir" in custom_args:
         for args in unfold_config(custom_args):
-            #try:
             print(args)
             if "prepare" in args:
                 args = embed(**args)
@@ -227,30 +226,9 @@ def main(config):
     else:
         pretrain(**custom_args)
         print("Finished pretraining GIFFLAR on", custom_args["file_path"])
-        #except Exception as e:
-        #    print(args["model"]["name"], "failed on", args["dataset"]["name"], "with", f"\"{e}\"")
 
 
 if __name__ == '__main__':
-    #embed(
-    #    prep_args={
-    #        "model_name": "GIFFLAR",
-    #        "ckpt_path": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret/gifflar_dyn_re_pretrain/version_0/checkpoints/epoch=99-step=6200.ckpt",
-    #        "hparams_path": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret/gifflar_dyn_re_pretrain/version_0/hparams.yaml",
-    #        "save_dir":"/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_embed/",
-    #    },
-    #    **{
-    #        "seed": 42,
-    #        "data_dir": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/",
-    #        "root_dir": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_embed",
-    #        "logs_dir": "/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_embed",
-    #        "dataset": {"name": "Immunogenicity", "task": "classification"},
-    #        "pre-transforms": {},
-    #        "hash": "12345678",
-    #        "model": {},
-    #    }
-    #)
     parser = ArgumentParser()
     parser.add_argument("config", type=str, help="Path to YAML config file")
     main(parser.parse_args().config)
-

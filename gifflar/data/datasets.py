@@ -1,10 +1,10 @@
 from pathlib import Path
-from typing import Tuple, Union, List, Optional, Callable, Any
+from typing import Union, Optional, Callable, Any
 
 import numpy as np
 import pandas as pd
 import torch
-from torch_geometric.data import InMemoryDataset
+from torch_geometric.data import InMemoryDataset, HeteroData
 from tqdm import tqdm
 
 from gifflar.data.utils import GlycanStorage
@@ -19,7 +19,7 @@ class GlycanDataset(InMemoryDataset):
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
             path_idx: int = 0,
-            **dataset_args,
+            **dataset_args: dict[str, Any],
     ):
         """
         Initialize the dataset with the given parameters.
@@ -52,12 +52,18 @@ class GlycanDataset(InMemoryDataset):
         return self.data[item] if self.transform is None else self.transform(self.data[item])
 
     @property
-    def processed_paths(self) -> List[str]:
+    def processed_paths(self) -> list[str]:
         """Return the list of processed paths."""
         return [str(Path(self.root) / f) for f in self.processed_file_names]
 
-    def process_(self, data, path_idx: int = 0) -> None:
-        """Filter, process the data and store it at the given path index."""
+    def process_(self, data: list[HeteroData], path_idx: int = 0) -> None:
+        """
+        Filter, process the data and store it at the given path index.
+
+        Args:
+            data: The data to process
+            path_idx: The index of the processed file name to use
+        """
         if self.pre_filter is not None:
             data = [d for d in data if self.pre_filter(d)]
         if self.pre_transform is not None:
@@ -75,7 +81,7 @@ class PretrainGDs(GlycanDataset):
             hash_code: str,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
-            **dataset_args
+            **dataset_args: dict[str, Any],
     ):
         """
         Initialize the dataset for pre-training with the given parameters.
@@ -92,11 +98,11 @@ class PretrainGDs(GlycanDataset):
                          pre_transform=pre_transform, **dataset_args)
 
     @property
-    def processed_file_names(self) -> Union[str, List[str], Tuple[str, ...]]:
+    def processed_file_names(self) -> Union[str, list[str], tuple[str, ...]]:
         """Return the list of processed file names"""
         return [self.filename.stem + ".pt"]
 
-    def process(self):
+    def process(self) -> None:
         """Process the data and store it."""
         data = []
         gs = GlycanStorage(Path(self.root).parent)
@@ -123,7 +129,7 @@ class DownstreamGDs(GlycanDataset):
             hash_code: str,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
-            **dataset_args: Any,
+            **dataset_args: dict[str, Any],
     ):
         """
         Initialize the dataset for downstream tasks with the given parameters.
@@ -141,11 +147,11 @@ class DownstreamGDs(GlycanDataset):
                          pre_transform=pre_transform, path_idx=self.splits[split], **dataset_args)
 
     @property
-    def processed_file_names(self) -> Union[str, List[str], Tuple[str, ...]]:
+    def processed_file_names(self) -> Union[str, list[str], tuple[str, ...]]:
         """Return the list of processed file names."""
         return [split + ".pt" for split in self.splits.keys()]
 
-    def to_statistical_learning(self) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray]]:
+    def to_statistical_learning(self) -> tuple[np.ndarray, np.ndarray, Optional[np.ndarray]]:
         """
         Convert the data to a format suitable for statistical learning (sklearn).
 
@@ -164,8 +170,8 @@ class DownstreamGDs(GlycanDataset):
             return np.vstack(X), np.concatenate(y), np.vstack(y_oh) if len(y_oh) != 0 else None
 
     def process(self) -> None:
-        print("Start processing")
         """Process the data and store it."""
+        print("Start processing")
         data = {k: [] for k in self.splits}
         df = pd.read_csv(self.filename, sep="\t" if self.filename.suffix.lower().endswith(".tsv") else ",")
 

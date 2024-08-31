@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Dict
+from typing import Literal, Optional
 
 import torch
 from glycowork.glycan_data.loader import lib
@@ -12,7 +12,6 @@ from gifflar.model.utils import MultiEmbedding, get_gin_layer
 from gifflar.pretransforms import LaplacianPE, RandomWalkPE
 from gifflar.utils import bond_map, atom_map
 
-
 PRE_TRANSFORMS = {
     "LaplacianPE": LaplacianPE,
     "RandomWalkPE": RandomWalkPE,
@@ -21,7 +20,7 @@ PRE_TRANSFORMS = {
 
 class GlycanGIN(LightningModule):
     def __init__(self, feat_dim: int, hidden_dim: int, num_layers: int, batch_size: int = 32,
-                 pre_transform_args: Optional[Dict] = None):
+                 pre_transform_args: Optional[dict] = None):
         """
         Initialize the GlycanGIN model, the base for all DL-models in this package
 
@@ -96,22 +95,22 @@ class GlycanGIN(LightningModule):
 
         return batch.x_dict
 
-    def shared_step(self, batch: HeteroData, stage: Literal["train", "val", "test"]) -> dict:
+    def shared_step(self, batch: HeteroData, stage: Literal["train", "val", "test"]) -> dict[str, torch.Tensor]:
         raise NotImplementedError()
 
-    def training_step(self, batch: HeteroData, batch_idx: int) -> dict:
+    def training_step(self, batch: HeteroData, batch_idx: int) -> dict[str, torch.Tensor]:
         """Compute the training step of the model"""
         return self.shared_step(batch, "train")
 
-    def validation_step(self, batch: HeteroData, batch_idx: int) -> dict:
+    def validation_step(self, batch: HeteroData, batch_idx: int) -> dict[str, torch.Tensor]:
         """Compute the validation step of the model"""
         return self.shared_step(batch, "val")
 
-    def test_step(self, batch: HeteroData, batch_idx: int) -> dict:
+    def test_step(self, batch: HeteroData, batch_idx: int) -> dict[str, torch.Tensor]:
         """Compute the testing step of the model"""
         return self.shared_step(batch, "test")
 
-    def shared_end(self, stage: Literal["train", "val", "test"]) -> None:
+    def shared_end(self, stage: Literal["train", "val", "test"]) -> dict[str, torch.Tensor]:
         raise NotImplementedError()
 
     def on_train_epoch_end(self) -> None:

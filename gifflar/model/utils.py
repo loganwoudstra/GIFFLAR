@@ -1,16 +1,10 @@
-from typing import Literal
+from typing import Literal, Any
 
 import torch
 from torch import nn
 from torch_geometric.nn import GINConv, global_mean_pool
 
 from gifflar.utils import get_metrics
-
-
-def dict_embeddings(dim: int, keys: list[object]):
-    emb = nn.Embedding(len(keys) + 1, dim)
-    mapping = {key: i for i, key in enumerate(keys)}
-    return lambda x: emb[mapping.get(x, len(keys))]
 
 
 def get_gin_layer(input_dim: int, output_dim: int) -> GINConv:
@@ -34,17 +28,36 @@ def get_gin_layer(input_dim: int, output_dim: int) -> GINConv:
     )
 
 
-def get_prediction_head(input_dim: int, num_predictions: int,
-                        task: Literal["regression", "classification", "multilabel"], metric_prefix: str = "") -> tuple:
+def get_prediction_head(
+        input_dim: int,
+        num_predictions: int,
+        task: Literal["regression", "classification", "multilabel"],
+        metric_prefix: str = ""
+) -> tuple[nn.Module, nn.Module, dict[str, nn.Module]]:
+    """
+    Create the prediction head for the specified dimensions and generate the loss and metrics for the task
+
+    Args:
+        input_dim: The input dimension of the prediction head
+        num_predictions: The number of predictions to make
+        task: The task to perform, either "regression", "classification" or "multilabel"
+        metric_prefix: The prefix to use for the metrics
+
+    Returns:
+        A tuple containing the prediction head, the loss function and the metrics for the task
+    """
+    # Create the prediction head
     head = nn.Sequential(
         nn.Linear(input_dim, input_dim // 2),
         nn.PReLU(),
         nn.Dropout(0.2),
         nn.Linear(input_dim // 2, num_predictions)
     )
+    # Add a softmax layer if the task is classification and there are multiple predictions
     if task == "classification" and num_predictions > 1:
         head.append(nn.Softmax(dim=-1))
 
+    # Create the loss function based on the task and the number of outputs to predict
     if task == "regression":
         loss = nn.MSELoss()
     elif num_predictions == 1 or task == "multilabel":
@@ -52,6 +65,7 @@ def get_prediction_head(input_dim: int, num_predictions: int,
     else:
         loss = nn.CrossEntropyLoss()
 
+    # Get the metrics for the task
     metrics = get_metrics(task, num_predictions, metric_prefix)
     return head, loss, metrics
 
@@ -70,7 +84,7 @@ class MultiEmbedding(nn.Module):
         for name, embedding in embeddings.items():
             setattr(self, name, embedding)
 
-    def forward(self, input_, name):
+    def forward(self, input_: dict[str, Any], name: str) -> torch.Tensor:
         """
         Embed the input using the specified embedding
 
@@ -93,7 +107,7 @@ class GIFFLARPooling(nn.Module):
             output_dim: The output dimension of the pooling layer
         """
         super().__init__()
-        match(mode):
+        match (mode):
             case "global_mean":
                 self.pooling = global_mean_pool
             case _:

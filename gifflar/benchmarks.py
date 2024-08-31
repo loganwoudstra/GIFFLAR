@@ -1,6 +1,6 @@
 import urllib.request
 from pathlib import Path
-from typing import Dict, Literal
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -98,7 +98,7 @@ def get_immunogenicity() -> Path:
     return p
 
 
-def get_glycosylation():
+def get_glycosylation() -> Path:
     """
     Download glycosylation data, process it, and save it as a tsv file.
 
@@ -126,7 +126,7 @@ def get_glycosylation():
     return p
 
 
-def get_dataset(data_config) -> Dict:
+def get_dataset(data_config) -> dict:
     """
     Get the dataset based on the configuration.
 

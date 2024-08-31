@@ -42,9 +42,7 @@ def split_hetero_graph(data: HeteroData) -> tuple[Data, Data, Data]:
 
 
 def hetero_to_homo(data: HeteroData) -> Data:
-    """
-    Convert a heterogeneous graph to a homogeneous by collapsing the node types and removing all node features
-    """
+    """Convert a heterogeneous graph to a homogeneous by collapsing the node types and removing all node features."""
     bond_edge_index = data["bonds", "boundary", "bonds"]["edge_index"] + data["atoms"]["num_nodes"]
     monosacchs_edge_index = data["bonds", "boundary", "bonds"]["edge_index"] + data["atoms"]["num_nodes"] + \
                             data["bonds"]["num_nodes"]
@@ -141,6 +139,12 @@ class RGCNTransform(RootTransform):
     def __call__(self, data: HeteroData) -> HeteroData:
         """
         Add self-loops to the graph for the RGCN model.
+
+        Args:
+            data: The input data to be transformed.
+
+        Returns:
+            The transformed data.
         """
         data["atoms", "self", "atoms"].edge_index = torch.stack([
             torch.arange(data["atoms"]["num_nodes"]),
@@ -263,6 +267,8 @@ class LaplacianPE(AddLaplacianEigenvectorPE):
 
     def __init__(self, dim: int, individual: bool = True, **kwargs: Any):
         """
+        Initialize the Laplacian positional encoding transformation.
+
         Args:
             dim: Number of eigenvectors to compute. (k)
             individual: Whether to compute eigenvectors for each node type individually.
@@ -312,6 +318,8 @@ class RandomWalkPE(RootTransform):
 
     def __init__(self, dim: int, individual: bool = True, cuda: bool = False, **kwargs: Any):
         """
+        Initialize the RandomWalk positional encoding.
+
         Args:
             dim: The number of random walk steps (walk_length).
             individual: Whether to compute eigenvectors for each node type individually.
@@ -412,6 +420,16 @@ class PretrainEmbed(RootTransform):
     """Run a GIFFLAR model to embed the input data."""
 
     def __init__(self, folder: str, dataset_name: str, model_name: str, hash_str: str, **kwargs: Any):
+        """
+        Set up the Embedding from a pretrained model.
+
+        Args:
+            folder: The folder where the preprocessed data is stored.
+            dataset_name: The name of the dataset.
+            model_name: The name of the model.
+            hash_str: The hash string of the model.
+            kwargs: Additional arguments
+        """
         super(PretrainEmbed, self).__init__(**kwargs)
         self.data = torch.load(Path(folder) / f"{dataset_name}_{model_name}_{hash_str}.pt")
         self.lookup = {smiles: (i, j) for i in range(len(self.data)) for j, smiles in enumerate(self.data[i]["smiles"])}
@@ -419,15 +437,29 @@ class PretrainEmbed(RootTransform):
         self.layer = kwargs.get("layer", -1)
 
     def __call__(self, data: HeteroData) -> HeteroData:
+        """
+        Compute the embeddings for the input data.
+
+        Args:
+            data: The input data to be transformed.
+
+        Returns:
+            The transformed data.
+        """
         if data["smiles"] not in self.lookup:
             print(data["smiles"], "not found in preprocessed data.")
             data["fp"] = torch.zeros_like(data["fp"])
             return data
 
+        # Lookup positional indices of the smiles string and compute masks for which data to use
         a, b = self.lookup[data["smiles"]]
         mask = {key: self.data[a]["batch_ids"][key] == b for key in ["atoms", "bonds", "monosacchs"]}
-        node_embeds = {key: self.data[a]["node_embeds"][self.layer][key][mask[key]] for key in ["atoms", "bonds", "monosacchs"]}
-        batch_ids = {key: torch.zeros(len(node_embeds[key]), dtype=torch.long) for key in ["atoms", "bonds", "monosacchs"]}
+
+        # apply the masks and extract the node embeddings and compute batch ids
+        node_embeds = {key: self.data[a]["node_embeds"][self.layer][key][mask[key]] for key in
+                       ["atoms", "bonds", "monosacchs"]}
+        batch_ids = {key: torch.zeros(len(node_embeds[key]), dtype=torch.long) for key in
+                     ["atoms", "bonds", "monosacchs"]}
         data["fp"] = self.pooling(node_embeds, batch_ids)
         return data
 
@@ -472,7 +504,7 @@ def get_pretransforms(dataset_name, **pre_transform_args) -> TQDMCompose:
         RGCNTransform(),
     ]
     for name, args in pre_transform_args.items():
-        match(name):
+        match (name):
             case "LaplacianPE":
                 pre_transforms.append(LaplacianPE(**args))
             case "RandomWalkPE":

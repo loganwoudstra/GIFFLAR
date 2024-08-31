@@ -13,7 +13,7 @@ transforms:
     prob: 0.15
 model:
   name: gifflar
-  feat_dim: 1024
+  feat_dim: 128
   hidden_dim: 1024
   batch_size: 256
   num_layers: 8

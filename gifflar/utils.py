@@ -3,7 +3,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
-from typing import Optional, Literal, Any, Dict, Generator
+from typing import Optional, Literal, Any, Generator
 
 import yaml
 from glycowork.glycan_data.loader import lib
@@ -142,7 +142,8 @@ def iupac2smiles(iupac: str) -> Optional[str]:
         return None
 
 
-def get_mods_list(node):
+def get_mods_list(node: dict[str, Any]) -> list[int]:
+    """Compute the one-hot encoding of modifications of a monosaccharides information provided in node."""
     ids = [0] * 16
     for mod in node["recipe"]:
         if mod != node["name"]:
@@ -203,7 +204,7 @@ def get_metrics(
         task: Literal["regression", "classification", "multilabel"],
         n_outputs: int,
         prefix: str = "",
-) -> Dict[str, MetricCollection]:
+) -> dict[str, MetricCollection]:
     """
     Collect the metrics to monitor a models learning progress. For regression tasks, we monitor
       - the MSE,

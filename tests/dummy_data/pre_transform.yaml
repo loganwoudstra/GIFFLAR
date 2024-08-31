@@ -33,6 +33,7 @@ pre-transforms:
     dim: 20
 model:
   - name: gifflar
+    feat_dim: 128
     hidden_dim: 128
     batch_size: 32
     num_layers: 3

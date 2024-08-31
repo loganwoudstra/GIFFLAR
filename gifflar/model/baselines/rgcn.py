@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Dict, Any
+from typing import Literal, Optional, Any
 
 import torch
 from torch import nn
@@ -8,24 +8,49 @@ from gifflar.model.downstream import DownstreamGGIN
 
 
 class HeteroPReLU(nn.Module):
-    def __init__(self, prelus: dict[str, nn.PReLU]) -> None:
+    def __init__(self, prelus: dict[str, nn.PReLU]):
+        """
+        A module that applies a PReLU activation function to each input.
+
+        Args:
+            prelus: The PReLU activations to apply to each input.
+        """
         super(HeteroPReLU, self).__init__()
         for name, prelu in prelus.items():
             setattr(self, name, prelu)
 
-    def forward(self, input_: dict):
+    def forward(self, input_: dict) -> dict:
+        """
+        Apply the PReLU activation to the input.
+
+        Args:
+            input_: The input to apply the activation to.
+
+        Returns:
+            The input with the PReLU activation applied.
+        """
         for key, value in input_.items():
             input_[key] = getattr(self, key).forward(value)
         return input_
 
 
 class RGCN(DownstreamGGIN):
-    def __init__(self, hidden_dim: int, output_dim: int, task: Literal["regression", "classification", "multilabel"],
-                 num_layers: int = 3, batch_size: int = 32, pre_transform_args: Optional[Dict] = None, **kwargs: Any):
+    def __init__(
+            self,
+            feat_dim: int,
+            hidden_dim: int,
+            output_dim: int,
+            task: Literal["regression", "classification", "multilabel"],
+            num_layers: int = 3,
+            batch_size: int = 32,
+            pre_transform_args: Optional[dict] = None,
+            **kwargs: Any
+    ):
         """
         Implementation of the relational GCN model.
 
         Args:
+            feat_dim: The feature dimension of the model.
             hidden_dim: The dimensionality of the hidden layers.
             output_dim: The output dimension of the model
             task: The type of task to perform.
@@ -34,7 +59,8 @@ class RGCN(DownstreamGGIN):
             pre_transform_args: The arguments for the pre-transforms.
             kwargs: Additional arguments
         """
-        super(RGCN, self).__init__(hidden_dim, output_dim, task, num_layers, batch_size, pre_transform_args, **kwargs)
+        super(RGCN, self).__init__(feat_dim, hidden_dim, output_dim, task, num_layers, batch_size, pre_transform_args,
+                                   **kwargs)
 
         self.convs = torch.nn.ModuleList()
         dims = [kwargs["feat_dim"], hidden_dim // 2] + [hidden_dim] * (num_layers - 1)

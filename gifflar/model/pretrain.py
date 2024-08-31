@@ -13,7 +13,7 @@ from gifflar.utils import mono_map, bond_map, atom_map
 
 class PretrainGGIN(GlycanGIN):
     def __init__(self, hidden_dim: int, tasks: list[dict[str, Any]] | None, num_layers: int = 3, batch_size: int = 32,
-                 pre_transform_args: Optional[dict] = None, **kwargs):
+                 pre_transform_args: Optional[dict] = None, **kwargs: Any):
         """
         Initialize the PretrainGGIN model, a pre-training model for downstream tasks.
 
@@ -42,7 +42,10 @@ class PretrainGGIN(GlycanGIN):
 
         self.loss = MultiLoss(4, dynamic=kwargs.get("loss", "static") == "dynamic")
 
-    def to(self, device):
+    def to(self, device: torch.device) -> "PretrainGGIN":
+        """
+        Move the model to the specified device.
+        """
         self.atom_mask_head.to(device)
         self.atom_mask_loss.to(device)
         self.atom_mask_metrics["train"].to(device)
@@ -67,9 +70,10 @@ class PretrainGGIN(GlycanGIN):
         self.mods_pred_metrics["val"].to(device)
         self.mods_pred_metrics["test"].to(device)
 
-        return super().to(device)
+        super(PretrainGGIN, self).to(device)
+        return self
 
-    def forward(self, batch: HeteroDataBatch) -> dict:
+    def forward(self, batch: HeteroDataBatch) -> dict[str, torch.Tensor]:
         """
         Forward pass of the model.
 
@@ -92,7 +96,7 @@ class PretrainGGIN(GlycanGIN):
             "mods_preds": mods_preds,
         }
 
-    def predict_step(self, batch: HeteroDataBatch) -> dict:
+    def predict_step(self, batch: HeteroDataBatch) -> dict[str, torch.Tensor]:
         """
         Predict the output of the model and return the node embeddings from all layers
 
@@ -102,6 +106,8 @@ class PretrainGGIN(GlycanGIN):
         Returns:
             A dictionary containing:
                 node_embeds: The node embeddings from all layers
+                batch_ids: The batch IDs of the nodes
+                smiles: The SMILES strings of the molecules
         """
 
         for key in batch.x_dict.keys():
@@ -122,7 +128,18 @@ class PretrainGGIN(GlycanGIN):
 
         return {"node_embeds": node_embeds, "batch_ids": batch.batch_dict, "smiles": batch["smiles"]}
 
-    def shared_step(self, batch: HeteroDataBatch, stage: Literal["train", "val", "test"]) -> dict:
+    def shared_step(self, batch: HeteroDataBatch, stage: Literal["train", "val", "test"]) -> dict[str, torch.Tensor]:
+        """
+        Shared step for training, validation and testing steps. Forwarding the batch through the model and computing
+        the loss and metrics.
+
+        Args:
+            batch: The batch of data to process
+            stage: The stage of the model, either "train", "val" or "test"
+
+        Returns:
+            A dictionary containing loss information and embeddings
+        """
         fwd_dict = self.forward(batch)
 
         fwd_dict["atom_loss"] = self.atom_mask_loss(fwd_dict["atom_preds"], batch["atoms_y"] - 1)
@@ -149,6 +166,12 @@ class PretrainGGIN(GlycanGIN):
         return fwd_dict
 
     def shared_end(self, stage: Literal["train", "val", "test"]) -> None:
+        """
+        Shared step between training, validation, and test ends. Computing and logging all relevant metrics
+
+        Params:
+            stage: The stage of the model, either "train", "val" or "test"
+        """
         metrics = self.atom_mask_metrics[stage].compute()
         self.log_dict(metrics)
         self.atom_mask_metrics[stage].reset()

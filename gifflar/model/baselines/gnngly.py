@@ -1,4 +1,4 @@
-from typing import Dict, Literal, Any
+from typing import Literal, Any
 from collections import OrderedDict
 
 import torch
@@ -7,6 +7,7 @@ from torch_geometric.nn import GCNConv, global_mean_pool
 
 from gifflar.data.hetero import HeteroDataBatch
 from gifflar.model.downstream import DownstreamGGIN
+from gifflar.model.utils import GIFFLARPooling
 
 """
 # Model properties extracted from GNNGLY
@@ -27,28 +28,31 @@ class GNNGLY(DownstreamGGIN):
     fill in what sounds reasonable
     """
 
-    def __init__(self, hidden_dim: int, num_layers: int, output_dim: int,
+    def __init__(self, feat_dim: int, hidden_dim: int, num_layers: int, output_dim: int,
                  task: Literal["classification", "regression", "multilabel"], **kwargs: Any):
         """
         Initialize the model following the papers description.
 
         Args:
+            feat_dim: The dimension of the input features
             hidden_dim: The dimension of the hidden layers
             num_layers: The number of GCN layers
             output_dim: The dimension of the output layer
             task: The task to solve
             kwargs: Additional arguments to pass to the model
         """
-        super().__init__(hidden_dim, output_dim, task, **kwargs)
+        super().__init__(feat_dim, hidden_dim, output_dim, task, **kwargs)
 
         del self.convs
 
-        self.layers = nn.Sequential(OrderedDict([(f"layer{l + 1}", GCNConv((133 if l == 0 else hidden_dim), hidden_dim)) for l in range(num_layers)]))
+        self.layers = nn.Sequential(OrderedDict(
+            [(f"layer{l + 1}", GCNConv((133 if l == 0 else hidden_dim), hidden_dim)) for l in range(num_layers)]))
 
         # ASSUMPTION: mean pooling
-        self.pooling = global_mean_pool
+        del self.pooling
+        self.pooling = global_mean_pool  # GIFFLARPooling()
 
-    def forward(self, batch: HeteroDataBatch) -> Dict[str, torch.Tensor]:
+    def forward(self, batch: HeteroDataBatch) -> dict[str, torch.Tensor]:
         """
         Forward the data though the model.
 

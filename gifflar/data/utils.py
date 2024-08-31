@@ -1,7 +1,7 @@
 import copy
 import pickle
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional
 import re
 
 import glyles
@@ -38,7 +38,14 @@ def clean_tree(tree: nx.Graph) -> Optional[nx.Graph]:
 def iupac2mol(iupac: str) -> Optional[HeteroData]:
     """
     Convert a glycan stored given as IUPAC-condensed string into an RDKit molecule while keeping the information of
-    which atom and which bond belongs to which monosaccharide
+    which atom and which bond belongs to which monosaccharide.
+
+    Args:
+        iupac: The IUPAC-condensed string of the glycan to convert
+
+    Returns:
+        A HeteroData object containing the IUPAC string, the SMILES representation, the RDKit molecule, and the
+        monosaccharide tree
     """
     # convert the IUPAC string using GlyLES
     glycan = glyles.Glycan(iupac)
@@ -188,7 +195,7 @@ def connect_nx(atom: int, child_start: int, kids: nx.Graph, me: nx.Graph, origin
 
 
 class S3NMerger(Merger):
-    def merge(self, t, root_orientation: str = "n", start: int = 100) -> nx.Graph:
+    def merge(self, t: nx.Graph, root_orientation: str = "n", start: int = 100) -> nx.Graph:
         """
         Merge a tree into a single molecule.
 
@@ -205,17 +212,14 @@ class S3NMerger(Merger):
         # then merge the tree into a single molecule
         return self.__merge(t, 0, 0)
 
-    def __mark(self, t: nx.Graph, node: int, p_edge: Optional[str] = None):
+    def __mark(self, t: nx.Graph, node: int, p_edge: Optional[str] = None) -> None:
         """
         Recursively mark in every node of the molecule which atoms are being replaced by bound monomers.
 
         Args:
-            t (networkx.DiGraph): Tree representing the glycan to compute the whole SMILES representation for.
-            node (int): ID of the node to work on in this method
-            p_edge (str): edge annotation to parent monomer
-
-        Returns:
-            Nothing
+            t: Tree representing the glycan to compute the whole SMILES representation for.
+            node: ID of the node to work on in this method
+            p_edge: edge annotation to parent monomer
         """
         # get children nodes
         children = [x[1] for x in t.edges(node)]
@@ -237,7 +241,7 @@ class S3NMerger(Merger):
             t.nodes[node]["type"].mark(int(binding), *atom)
             self.__mark(t, child, t.get_edge_data(node, child)["type"])
 
-    def __merge(self, t: nx.Graph, node: int, start: int, ring_index: Optional[int] = None):
+    def __merge(self, t: nx.Graph, node: int, start: int, ring_index: Optional[int] = None) -> nx.Graph:
         """
         Recursively merge a tree into a single molecule.
 
@@ -274,7 +278,7 @@ def mol2nx(mol: rdkit.Chem.Mol, node: int) -> nx.Graph:
     Convert a monosaccharide to a networkx graph.
 
     Args:
-        The molecule to be converted
+        mol: The molecule to be converted
         node: The monosaccharide ID in the whole glycan
 
     Returns:
@@ -304,7 +308,7 @@ def mol2nx(mol: rdkit.Chem.Mol, node: int) -> nx.Graph:
 
 
 class GlycanStorage:
-    def __init__(self, path: Optional[Path | str] = None):
+    def __init__(self, path: Path | str | None = None):
         """
         Initialize the wrapper around a dict.
 
@@ -329,7 +333,7 @@ class GlycanStorage:
         Query the storage for a IUPAC string.
 
         Args:
-            The IUPAC string of the query glycan
+            iupac: The IUPAC string of the query glycan
 
         Returns:
             A HeteroData object corresponding to the IUPAC string or None, if the IUPAC string could not be processed.
@@ -341,7 +345,7 @@ class GlycanStorage:
                 self.data[iupac] = None
         return copy.deepcopy(self.data[iupac])
 
-    def _load(self) -> Dict[str, Optional[HeteroData]]:
+    def _load(self) -> dict[str, Optional[HeteroData]]:
         """
         Load the internal dictionary from the file, if it exists, otherwise, return an empty dict.
 

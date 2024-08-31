@@ -5,24 +5,24 @@ logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_embed
 datasets:
   - name: Immunogenicity
     task: classification
-#  - name: Glycosylation
-#    task: classification
-#  - name: Taxonomy_Domain
-#    task: multilabel
-#  - name: Taxonomy_Kingdom
-#    task: multilabel
-#  - name: Taxonomy_Phylum
-#    task: multilabel
-#  - name: Taxonomy_Class
-#    task: multilabel
-#  - name: Taxonomy_Order
-#    task: multilabel
-#  - name: Taxonomy_Family
-#    task: multilabel
-#  - name: Taxonomy_Genus
-#    task: multilabel
-#  - name: Taxonomy_Species
-#    task: multilabel
+  - name: Glycosylation
+    task: classification
+  - name: Taxonomy_Domain
+    task: multilabel
+  - name: Taxonomy_Kingdom
+    task: multilabel
+  - name: Taxonomy_Phylum
+    task: multilabel
+  - name: Taxonomy_Class
+    task: multilabel
+  - name: Taxonomy_Order
+    task: multilabel
+  - name: Taxonomy_Family
+    task: multilabel
+  - name: Taxonomy_Genus
+    task: multilabel
+  - name: Taxonomy_Species
+    task: multilabel
 prepare:
   name: GIFFLAR
   ckpt_path: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret/gifflar_dyn_re_pretrain/version_0/checkpoints/epoch=99-step=6200.ckpt

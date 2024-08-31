@@ -1,19 +1,27 @@
-from typing import Literal, Optional
+from typing import Literal, Optional, Any
 
 import torch
 from torch import nn
 from torch_geometric.data import HeteroData
-from torch_geometric.nn import global_mean_pool
 
 from gifflar.data.hetero import HeteroDataBatch
 from gifflar.model.base import GlycanGIN
-from gifflar.model.utils import GIFFLARPooling
+from gifflar.model.utils import GIFFLARPooling, get_prediction_head
 from gifflar.utils import get_metrics
 
 
 class DownstreamGGIN(GlycanGIN):
-    def __init__(self, hidden_dim: int, output_dim: int, task: Literal["regression", "classification", "multilabel"],
-                 num_layers: int = 3, batch_size: int = 32, pre_transform_args: Optional[dict] = None, **kwargs):
+    def __init__(
+            self,
+            feat_dim: int,
+            hidden_dim: int,
+            output_dim: int,
+            task: Literal["regression", "classification", "multilabel"],
+            num_layers: int = 3,
+            batch_size: int = 32,
+            pre_transform_args: Optional[dict] = None,
+            **kwargs: Any,
+    ):
         """
         Initialize the DownstreamGGIN model, a downstream model from a pre-trained GlycanGIN model.
 
@@ -26,35 +34,15 @@ class DownstreamGGIN(GlycanGIN):
             pre_transform_args: A dictionary of pre-transforms to apply to the input data
             kwargs: Additional arguments
         """
-        super().__init__(kwargs["feat_dim"], hidden_dim, num_layers, batch_size, pre_transform_args)
+        super().__init__(feat_dim, hidden_dim, num_layers, batch_size, pre_transform_args)
         self.output_dim = output_dim
 
         self.pooling = GIFFLARPooling()
         self.task = task
 
-        # Define the classification head of the model
-        self.head = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.PReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(hidden_dim // 2, self.output_dim)
-        )
-        if self.task == "multilabel":
-            self.head.append(nn.Sigmoid())
+        self.head, self.loss, self.metrics = get_prediction_head(hidden_dim, output_dim, task)
 
-        # Define the loss function based on the task and the number of outputs to predict
-        if self.task == "regression":
-            self.loss = nn.MSELoss()
-        elif self.output_dim == 1:
-            self.loss = nn.BCEWithLogitsLoss()
-        elif self.task == "multilabel":
-            self.loss = nn.BCELoss()
-        else:
-            self.loss = nn.CrossEntropyLoss()
-
-        self.metrics = get_metrics(self.task, self.output_dim)
-
-    def to(self, device: torch.device):
+    def to(self, device: torch.device) -> "DownstreamGGIN":
         """
         Move the model to the specified device.
 
@@ -69,7 +57,7 @@ class DownstreamGGIN(GlycanGIN):
             self.metrics[split] = metric.to(device)
         return self
 
-    def forward(self, batch: HeteroDataBatch) -> dict:
+    def forward(self, batch: HeteroDataBatch) -> dict[str, torch.Tensor]:
         """
         Forward pass of the model.
 
@@ -91,7 +79,7 @@ class DownstreamGGIN(GlycanGIN):
             "preds": pred,
         }
 
-    def shared_step(self, batch: HeteroData, stage: Literal["train", "val", "test"]) -> dict:
+    def shared_step(self, batch: HeteroData, stage: Literal["train", "val", "test"]) -> dict[str, torch.Tensor]:
         """
         Shared step for training, validation and testing steps.
 
