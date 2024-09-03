@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any
+import time
 
 import torch
 import yaml
@@ -88,7 +89,9 @@ def fit(**kwargs: Any) -> None:
     train_X, train_y, train_yoh = datamodule.train.to_statistical_learning()
 
     # fit the model
+    start = time.time()
     model.fit(train_X, train_yoh if data_config["task"] == "multilabel" else train_y)
+    print("Training took", time.time() - start, "s")
 
     # evaluate the model on all splits
     for X, y, yoh, name in [
@@ -143,7 +146,9 @@ def train(**kwargs: Any) -> None:
         max_epochs=kwargs["model"]["epochs"],
         logger=logger,
     )
+    start = time.time()
     trainer.fit(model, datamodule)
+    print("Training took", time.time() - start, "s")
 
 
 def pretrain(**kwargs: Any) -> None:
@@ -200,7 +205,7 @@ def embed(prep_args: dict[str, str], **kwargs: Any) -> None:
     with open(prep_args["hparams_path"], "r") as file:
         config = yaml.load(file, Loader=yaml.FullLoader)
     model = PretrainGGIN(**config["model"], tasks=None, pre_transform_args=kwargs.get("pre-transforms", {}))
-    if torch.is_cuda_available():
+    if torch.cuda.is_available():
         model.load_state_dict(torch.load(prep_args["ckpt_path"])["state_dict"])
     else:
         model.load_state_dict(torch.load(prep_args["ckpt_path"], map_location=torch.device("cpu"))["state_dict"])

@@ -87,6 +87,8 @@ def unfold_config(config: dict) -> Generator[dict, None, None]:
     else:
         models = config["model"]
     del config["model"]
+    if models is None:
+        models = [{}]
 
     for dataset in datasets:
         for model in models:

@@ -1,7 +1,7 @@
 seed: 42
 data_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/
-root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data
-logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/clean_logs
+root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/time_data
+logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/time_logs
 datasets:
   - name: Immunogenicity
     task: classification
@@ -42,41 +42,41 @@ model:
     patience: 30
     learning_rate: 0
     optimizer: Adam
-#  - name: sweetnet
-#    feat_dim: 128
-#    hidden_dim: 1024
-#    batch_size: 512
-#    num_layers: 16
-#    epochs: 1
-#    patience: 30
-#    learning_rate: 0.001
-#    optimizer: Adam
-#    suffix:
-#  - name: gnngly
-#    feat_dim: 128
-#    hidden_dim: 1024
-#    batch_size: 512
-#    num_layers: 8
-#    epochs: 1
-#    patience: 30
-#    learning_rate: 0.001
-#    optimizer: Adam
-#    suffix:
-#  - name: rgcn
-#    feat_dim: 128
-#    hidden_dim: 1024
-#    batch_size: 256
-#    num_layers: 8
-#    epochs: 1
-#    learning_rate: 0.001
-#    optimizer: Adam
-#    suffix:
-#  - name: gifflar
-#    feat_dim: 128
-#    hidden_dim: 1024
-#    batch_size: 256
-#    num_layers: 8
-#    epochs: 1
-#    learning_rate: 0.001
-#    optimizer: Adam
-#    suffix:
+  - name: sweetnet
+    feat_dim: 128
+    hidden_dim: 1024
+    batch_size: 512
+    num_layers: 16
+    epochs: 1
+    patience: 30
+    learning_rate: 0.001
+    optimizer: Adam
+    suffix:
+  - name: gnngly
+    feat_dim: 128
+    hidden_dim: 1024
+    batch_size: 512
+    num_layers: 8
+    epochs: 1
+    patience: 30
+    learning_rate: 0.001
+    optimizer: Adam
+    suffix:
+  - name: rgcn
+    feat_dim: 128
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 8
+    epochs: 1
+    learning_rate: 0.001
+    optimizer: Adam
+    suffix:
+  - name: gifflar
+    feat_dim: 128
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 8
+    epochs: 1
+    learning_rate: 0.001
+    optimizer: Adam
+    suffix:

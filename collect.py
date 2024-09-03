@@ -8,10 +8,29 @@ from openpyxl.styles import Font
 
 model_order = {m: i for i, m in enumerate(["rf", "svm", "xgb", "mlp", "gnngly", "sweetnet", "rgcn", "gifflar"])}
 appendix_order = {"lp": 1, "rw": 2, "both": 3}
+
+
+def order_models(name: str) -> tuple:
+    parts = name.split("_")
+    mo = model_order.get(parts[0], 100)
+    if len(parts) == 1:
+        return mo,
+    parts[1] = appendix_order.get(parts[1], parts[1])
+    res = tuple([mo] + [int(x) for x in parts[1:]])
+    # print(name, res)
+    return res
+
+
+if len(sys.argv) > 3:
+    selection = set(sys.argv[3:])
+else:
+    selection = None
+
 with pd.ExcelWriter(sys.argv[2] + '.xlsx', engine='xlsxwriter') as writer:
     for metric in ["Accuracy", "MatthewsCorrCoef", "AUROC", "Sensitivity"]:
         root = Path(sys.argv[1])
-        models = sorted([str(x).split("/")[-1] for x in root.iterdir() if x.is_dir()], key=lambda x: (model_order.get(x.split("_")[0], 100), appendix_order.get(x.split("_")[-1], 0)))
+        models = sorted(filter(lambda x: selection is None or x in selection, [str(x).split("/")[-1] for x in root.iterdir() if x.is_dir()]), key=lambda x: order_models(x))
+        # print(models)
         datasets = ["Immunogenicity", "Glycosylation", "Domain", "Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"]
         df = pd.DataFrame(index=datasets, columns=models, dtype=float)
         df.fillna(-1.0, inplace=True)
@@ -27,7 +46,8 @@ with pd.ExcelWriter(sys.argv[2] + '.xlsx', engine='xlsxwriter') as writer:
                 if df.at[name, model] == -1:
                     res = pd.read_csv(v / "metrics.csv", index_col=0)
                     col = list(filter(lambda x: "val/" in x and metric in x, res.columns))
-                    df.at[name, model] = float(res[col].dropna().max().iloc[0])
+                    if len(col) != 0:
+                        df.at[name, model] = float(res[col].dropna().max().iloc[0])
         df.to_excel(writer, sheet_name=metric)
 
         workbook = writer.book
@@ -38,4 +58,3 @@ with pd.ExcelWriter(sys.argv[2] + '.xlsx', engine='xlsxwriter') as writer:
             for c, val in enumerate(row.values):
                 if val == max_val:
                     worksheet.write(r + 1, c + 1, val, bold_format)
-

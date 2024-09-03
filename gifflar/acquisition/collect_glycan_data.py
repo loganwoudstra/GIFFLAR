@@ -28,7 +28,10 @@ print("Glycans in combined list:", len(iupacs))
 
 expanded = []
 for glycan in list(filter(lambda x: "{" in x, iupacs)):
-    expanded += [graph_to_string(g) for g in get_possible_topologies(glycan)]
+    try:
+        expanded += [graph_to_string(g) for g in get_possible_topologies(glycan)]
+    except:
+        pass
 iupacs = list(filter(lambda x: "{" not in x, iupacs)) + expanded
 print("Glycans in expanded list:", len(iupacs))
 

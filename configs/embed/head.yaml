@@ -3,10 +3,10 @@ data_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/
 root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_embed
 logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_embed
 datasets:
-  #- name: Immunogenicity
-  #  task: classification
-  #- name: Glycosylation
-  #  task: classification
+  - name: Immunogenicity
+    task: classification
+  - name: Glycosylation
+    task: classification
   - name: Taxonomy_Domain
     task: multilabel
   - name: Taxonomy_Kingdom
@@ -31,12 +31,12 @@ prepare:
   nth_layer: -1
 pre-transforms:
 model:
-  - name: gifflar
-    feat_dim: 128
-    hidden_dim: 1024
-    batch_size: 256
-    num_layers: 8
-    epochs: 100
-    learning_rate: 0.001
-    optimizer: Adam
-    loss: dynamic
+#  - name: gifflar
+#    feat_dim: 128
+#    hidden_dim: 1024
+#    batch_size: 256
+#    num_layers: 8
+#    epochs: 100
+#    learning_rate: 0.001
+#    optimizer: Adam
+#    loss: dynamic

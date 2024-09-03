@@ -50,10 +50,12 @@ def cut_and_add(glycan):
     h = graph_hash(glycan)
     if h in known:
         return
-
-    known_iupacs.append(graph_to_string(glycan))
     known.add(h)
-    # print(h, known_iupacs[-1])
+    
+    try:
+        known_iupacs.append(graph_to_string(glycan))
+    except:
+        return
 
     # check if glycan is a single node
     if len(glycan.nodes()) == 1:
@@ -72,7 +74,10 @@ known_iupacs = []
 known = set()
 for i, iupac in enumerate(iupacs):
     print(f"\r{i}/{len(iupacs)}\t{iupac}", end="")
-    cut_and_add(glycan_to_nxGraph(iupac))
+    try:
+        cut_and_add(glycan_to_nxGraph(iupac))
+    except:
+        pass
 
 with open("subglycans.pkl", "wb") as f:
     pickle.dump(known_iupacs, f)
