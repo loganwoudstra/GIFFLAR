@@ -191,7 +191,7 @@ def embed(prep_args: dict[str, str], **kwargs: Any) -> None:
     """
     output_name = Path(prep_args["save_dir"]) / ("_".join([
         kwargs["dataset"]["name"],
-        prep_args["model_name"],
+        prep_args["name"],
         hash_dict(prep_args, 8),
     ]) + ".pt")
     if output_name.exists():
@@ -217,12 +217,13 @@ def main(config: str | Path) -> None:
         for args in unfold_config(custom_args):
             print(args)
             if "prepare" in args:
-                args = embed(**args)
-            if args["model"]["name"] in ["rf", "svm", "xgb"]:
-                fit(**args)
+                args = embed(args["prepare"], **args)
             else:
-                train(**args)
-            print("Finished training", args["model"]["name"], "on", args["dataset"]["name"])
+                if args["model"]["name"] in ["rf", "svm", "xgb"]:
+                    fit(**args)
+                else:
+                    train(**args)
+                print("Finished training", args["model"]["name"], "on", args["dataset"]["name"])
     else:
         pretrain(**custom_args)
         print("Finished pretraining GIFFLAR on", custom_args["file_path"])
