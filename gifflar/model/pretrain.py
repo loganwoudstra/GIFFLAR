@@ -41,6 +41,7 @@ class PretrainGGIN(GlycanGIN):
             = get_prediction_head(hidden_dim, 16, "multilabel", "mods")
 
         self.loss = MultiLoss(4, dynamic=kwargs.get("loss", "static") == "dynamic")
+        self.n = -1
 
     def to(self, device: torch.device) -> "PretrainGGIN":
         """
@@ -72,6 +73,15 @@ class PretrainGGIN(GlycanGIN):
 
         super(PretrainGGIN, self).to(device)
         return self
+
+    def save_nth_layer(self, n: int) -> None:
+        """
+        Save the nth layer of the model to the specified path.
+
+        Args:
+            n: The layer to save
+        """
+        self.nth_layer = n
 
     def forward(self, batch: HeteroDataBatch) -> dict[str, torch.Tensor]:
         """
@@ -118,15 +128,19 @@ class PretrainGGIN(GlycanGIN):
 
             batch.x_dict[key] = torch.concat(pes, dim=1)
 
-        node_embeds = []
+        layer_count = 0
         for conv in self.convs:
+            # save the nth layer as the final node embeddings
+            if layer_count == self.nth_layer:
+                return {"node_embeds": batch.x_dict, "batch_ids": batch.batch_dict, "smiles": batch["smiles"]}
+
             if isinstance(conv, HeteroConv):
                 batch.x_dict = conv(batch.x_dict, batch.edge_index_dict)
-                node_embeds.append(copy.deepcopy(batch.x_dict))
+                layer_count += 1
             else:  # the layer is an activation function from the RGCN
                 batch.x_dict = conv(batch.x_dict)
 
-        return {"node_embeds": node_embeds, "batch_ids": batch.batch_dict, "smiles": batch["smiles"]}
+        return {"node_embeds": batch.x_dict, "batch_ids": batch.batch_dict, "smiles": batch["smiles"]}
 
     def shared_step(self, batch: HeteroDataBatch, stage: Literal["train", "val", "test"]) -> dict[str, torch.Tensor]:
         """
