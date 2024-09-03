@@ -200,8 +200,12 @@ def embed(prep_args: dict[str, str], **kwargs: Any) -> None:
     with open(prep_args["hparams_path"], "r") as file:
         config = yaml.load(file, Loader=yaml.FullLoader)
     model = PretrainGGIN(**config["model"], tasks=None, pre_transform_args=kwargs.get("pre-transforms", {}))
-    model.load_state_dict(torch.load(prep_args["ckpt_path"], map_location=torch.device("cpu"))["state_dict"])
+    if torch.is_cuda_available():
+        model.load_state_dict(torch.load(prep_args["ckpt_path"])["state_dict"])
+    else:
+        model.load_state_dict(torch.load(prep_args["ckpt_path"], map_location=torch.device("cpu"))["state_dict"])
     model.eval()
+    model.save_nth_layer(int(prep_args["nth_layer"]))
 
     data_config, data, _, _ = setup(2, **kwargs)
     trainer = Trainer()

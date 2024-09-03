@@ -434,7 +434,6 @@ class PretrainEmbed(RootTransform):
         self.data = torch.load(Path(folder) / f"{dataset_name}_{model_name}_{hash_str}.pt")
         self.lookup = {smiles: (i, j) for i in range(len(self.data)) for j, smiles in enumerate(self.data[i]["smiles"])}
         self.pooling = GIFFLARPooling()
-        self.layer = kwargs.get("layer", -1)
 
     def __call__(self, data: HeteroData) -> HeteroData:
         """
@@ -456,7 +455,7 @@ class PretrainEmbed(RootTransform):
         mask = {key: self.data[a]["batch_ids"][key] == b for key in ["atoms", "bonds", "monosacchs"]}
 
         # apply the masks and extract the node embeddings and compute batch ids
-        node_embeds = {key: self.data[a]["node_embeds"][self.layer][key][mask[key]] for key in
+        node_embeds = {key: self.data[a]["node_embeds"][key][mask[key]] for key in
                        ["atoms", "bonds", "monosacchs"]}
         batch_ids = {key: torch.zeros(len(node_embeds[key]), dtype=torch.long) for key in
                      ["atoms", "bonds", "monosacchs"]}
@@ -485,7 +484,7 @@ class TQDMCompose(Compose):
         return data
 
 
-def get_pretransforms(dataset_name, **pre_transform_args) -> TQDMCompose:
+def get_pretransforms(dataset_name: str = "", **pre_transform_args: dict[str, dict]) -> TQDMCompose:
     """
     Calculate the list of pre-transforms to be applied to the data.
 
