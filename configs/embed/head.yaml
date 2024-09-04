@@ -28,15 +28,5 @@ prepare:
   ckpt_path: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret/gifflar_dyn_re_pretrain/version_0/checkpoints/epoch=99-step=6200.ckpt
   hparams_path: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret/gifflar_dyn_re_pretrain/version_0/hparams.yaml
   save_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_embed/
-  nth_layer: -1
 pre-transforms:
 model:
-#  - name: gifflar
-#    feat_dim: 128
-#    hidden_dim: 1024
-#    batch_size: 256
-#    num_layers: 8
-#    epochs: 100
-#    learning_rate: 0.001
-#    optimizer: Adam
-#    loss: dynamic

@@ -9,11 +9,6 @@ glycans_path = Path("glycans.pkl")
 if not glycans_path.exists():
     import collect_glycan_data
 
-print("Collecting subglycan data...\n============================")
-
-with open(glycans_path, "rb") as f:
-    _, iupacs, _ = pickle.load(f)
-
 
 def node_label_hash(label):
     """Hash function for individual node labels."""
@@ -70,10 +65,20 @@ def cut_and_add(glycan):
         cut_and_add(G)
 
 
+print("Collecting subglycan data...\n============================")
+
+with open(glycans_path, "rb") as f:
+    _, iupacs, _ = pickle.load(f)
+iupacs = sorted(iupacs, key=lambda x: x.count("("))
+
 known_iupacs = []
 known = set()
 for i, iupac in enumerate(iupacs):
     print(f"\r{i}/{len(iupacs)}\t{iupac}", end="")
+    if iupac.count("(") == 15:
+        print()
+        print(f"Stopped calculation due to high complexity after {i} of {len(iupacs)} glycans.")
+        break
     try:
         cut_and_add(glycan_to_nxGraph(iupac))
     except:

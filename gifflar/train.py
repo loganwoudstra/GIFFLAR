@@ -194,11 +194,8 @@ def embed(prep_args: dict[str, str], **kwargs: Any) -> None:
             pkl_dir: The directory to save the embeddings.
         kwargs: The configuration for the training.
     """
-    output_name = Path(prep_args["save_dir"]) / ("_".join([
-        kwargs["dataset"]["name"],
-        prep_args["name"],
-        hash_dict(prep_args, 8),
-    ]) + ".pt")
+    output_name = (Path(prep_args["save_dir"]) /
+                   f"{kwargs['dataset']['name']}_{prep_args['name']}_{hash_dict(prep_args, 8)}")
     if output_name.exists():
         return
 
@@ -213,9 +210,9 @@ def embed(prep_args: dict[str, str], **kwargs: Any) -> None:
     model.save_nth_layer(int(prep_args["nth_layer"]))
 
     data_config, data, _, _ = setup(2, **kwargs)
+    data.save_dir = output_name
     trainer = Trainer()
-    preds = trainer.predict(model, data.predict_dataloader())
-    torch.save(preds, output_name)
+    trainer.predict(model, data.predict_dataloader())
 
 
 def main(config: str | Path) -> None:
@@ -226,7 +223,7 @@ def main(config: str | Path) -> None:
         for args in unfold_config(custom_args):
             print(args)
             if "prepare" in args:
-                args = embed(args["prepare"], **args)
+                embed(args["prepare"], **args)
             else:
                 if args["model"]["name"] in ["rf", "svm", "xgb"]:
                     fit(**args)

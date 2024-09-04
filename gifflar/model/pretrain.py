@@ -1,4 +1,5 @@
 import copy
+from pathlib import Path
 from typing import Literal, Optional, Any
 
 import torch
@@ -13,7 +14,7 @@ from gifflar.utils import mono_map, bond_map, atom_map
 
 class PretrainGGIN(GlycanGIN):
     def __init__(self, hidden_dim: int, tasks: list[dict[str, Any]] | None, num_layers: int = 3, batch_size: int = 32,
-                 pre_transform_args: Optional[dict] = None, **kwargs: Any):
+                 pre_transform_args: Optional[dict] = None, save_dir: Path | str | None = None, **kwargs: Any):
         """
         Initialize the PretrainGGIN model, a pre-training model for downstream tasks.
 
@@ -41,7 +42,7 @@ class PretrainGGIN(GlycanGIN):
             = get_prediction_head(hidden_dim, 16, "multilabel", "mods")
 
         self.loss = MultiLoss(4, dynamic=kwargs.get("loss", "static") == "dynamic")
-        self.n = -1
+        self.save_dir = save_dir
 
     def to(self, device: torch.device) -> "PretrainGGIN":
         """
@@ -73,15 +74,6 @@ class PretrainGGIN(GlycanGIN):
 
         super(PretrainGGIN, self).to(device)
         return self
-
-    def save_nth_layer(self, n: int) -> None:
-        """
-        Save the nth layer of the model to the specified path.
-
-        Args:
-            n: The layer to save
-        """
-        self.nth_layer = n
 
     def forward(self, batch: HeteroDataBatch) -> dict[str, torch.Tensor]:
         """
@@ -128,19 +120,17 @@ class PretrainGGIN(GlycanGIN):
 
             batch.x_dict[key] = torch.concat(pes, dim=1)
 
-        layer_count = 0
+        layers = [copy.deepcopy(batch.x_dict)]
         for conv in self.convs:
-            # save the nth layer as the final node embeddings
-            if layer_count == self.nth_layer:
-                return {"node_embeds": batch.x_dict, "batch_ids": batch.batch_dict, "smiles": batch["smiles"]}
-
             if isinstance(conv, HeteroConv):
                 batch.x_dict = conv(batch.x_dict, batch.edge_index_dict)
-                layer_count += 1
+                layers.append(copy.deepcopy(batch.x_dict))
             else:  # the layer is an activation function from the RGCN
                 batch.x_dict = conv(batch.x_dict)
 
-        return {"node_embeds": batch.x_dict, "batch_ids": batch.batch_dict, "smiles": batch["smiles"]}
+        torch.save(layers, self.save_dir / f"{hash(batch.smiles[0])}.pt")
+
+        return {}
 
     def shared_step(self, batch: HeteroDataBatch, stage: Literal["train", "val", "test"]) -> dict[str, torch.Tensor]:
         """
