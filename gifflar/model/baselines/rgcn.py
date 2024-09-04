@@ -63,7 +63,7 @@ class RGCN(DownstreamGGIN):
                                    **kwargs)
 
         self.convs = torch.nn.ModuleList()
-        dims = [kwargs["feat_dim"], hidden_dim // 2] + [hidden_dim] * (num_layers - 1)
+        dims = [feat_dim, hidden_dim // 2] + [hidden_dim] * (num_layers - 1)
         for i in range(num_layers):
             convs = {
                 # Set the inner layers to be a single weight without using the nodes embedding (therefore, e=-1)
