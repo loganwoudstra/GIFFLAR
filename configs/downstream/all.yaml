@@ -1,7 +1,7 @@
 seed: 42
 data_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/
-root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data
-logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/clean_logs
+root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_test
+logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_test
 datasets:
   - name: Immunogenicity
     task: classification
@@ -76,8 +76,8 @@ model:
     hidden_dim: 1024
     batch_size: 256
     num_layers: 8
-    epochs: 1
+    epochs: 100
     learning_rate: 0.001
     optimizer: Adam
     pooling: local_mean
-    suffix:
+    suffix: _128_8_local
