@@ -1,0 +1,103 @@
+seed: 42
+data_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/
+root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_test
+logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pool
+datasets:
+  - name: Immunogenicity
+    task: classification
+  - name: Glycosylation
+    task: classification
+  - name: Taxonomy_Domain
+    task: multilabel
+pre-transforms:
+model:
+  - name: gifflar
+    feat_dim: 128
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 8
+    epochs: 100
+    learning_rate: 0.001
+    optimizer: Adam
+    pooling: global_mean
+    suffix: _global
+  - name: gifflar
+    feat_dim: 128
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 8
+    epochs: 100
+    learning_rate: 0.001
+    optimizer: Adam
+    pooling: local_mean
+    suffix: _local
+  - name: gifflar
+    feat_dim: 128
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 8
+    epochs: 100
+    learning_rate: 0.001
+    optimizer: Adam
+    pooling: weighted_mean
+    suffix: _weighted
+  - name: gifflar
+    feat_dim: 128
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 8
+    epochs: 100
+    learning_rate: 0.001
+    optimizer: Adam
+    pooling: global_attention
+    suffix: _attention
+  - name: gifflar
+    feat_dim: 128
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 8
+    epochs: 100
+    learning_rate: 0.001
+    optimizer: Adam
+    pooling: local_attention
+    suffix: _local_att
+  - name: gifflar
+    feat_dim: 128
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 8
+    epochs: 100
+    learning_rate: 0.001
+    optimizer: Adam
+    pooling: weighted_attention
+    suffix: _weighted_att
+  - name: gifflar
+    feat_dim: 128
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 8
+    epochs: 100
+    learning_rate: 0.001
+    optimizer: Adam
+    pooling: cell_attention
+    suffix: _cell_att
+  - name: gifflar
+    feat_dim: 128
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 8
+    epochs: 100
+    learning_rate: 0.001
+    optimizer: Adam
+    pooling: local_cell_attention
+    suffix: _local_cell_att
+  - name: gifflar
+    feat_dim: 128
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 8
+    epochs: 100
+    learning_rate: 0.001
+    optimizer: Adam
+    pooling: weighted_cell_attention
+    suffix: _weighted_cell_att
