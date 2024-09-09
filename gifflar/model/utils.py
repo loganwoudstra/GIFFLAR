@@ -107,11 +107,7 @@ class GIFFLARPooling(nn.Module):
             output_dim: The output dimension of the pooling layer
         """
         super().__init__()
-        match (mode):
-            case "global_mean":
-                self.pooling = global_mean_pool
-            case _:
-                raise ValueError(f"Pooling mode {mode} not implemented yet.")
+        self.mode = mode
 
     def forward(self, nodes: dict[str, torch.Tensor], batch_ids: dict[str, torch.Tensor]) -> torch.Tensor:
         """
@@ -120,7 +116,15 @@ class GIFFLARPooling(nn.Module):
         Args:
             x: The input to the pooling layer
         """
-        return self.pooling(
-            torch.concat([nodes["atoms"], nodes["bonds"], nodes["monosacchs"]], dim=0),
-            torch.concat([batch_ids["atoms"], batch_ids["bonds"], batch_ids["monosacchs"]], dim=0)
-        )
+        match self.mode:
+            case "global_mean":
+                return global_mean_pool(
+                    torch.concat([nodes["atoms"], nodes["bonds"], nodes["monosacchs"]], dim=0),
+                    torch.concat([batch_ids["atoms"], batch_ids["bonds"], batch_ids["monosacchs"]], dim=0)
+                )
+            case "local_mean":
+                return torch.sum(torch.stack([
+                    global_mean_pool(nodes[key], batch_ids[key]) for key in nodes.keys()
+                ]), dim=0)
+            case _:
+                raise ValueError(f"Pooling mode {self.mode} not supported")

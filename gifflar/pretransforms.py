@@ -368,11 +368,11 @@ class RandomWalkPE(RootTransform):
         """
         if self.individual:  # compute the random walk positional encodings for each node type individually
             for d, name in zip(split_hetero_graph(data), ["atoms", "bonds", "monosacchs"]):
-                self.forward(d)
+                d = self.forward(d)
                 data[f"{name}_{self.attr_name}"] = d[self.attr_name]
         else:  # or for the whole graph
             d = hetero_to_homo(data)
-            self.forward(d)
+            d = self.forward(d)
             data[f"atoms_{self.attr_name}"] = d[self.attr_name][:data["atoms"]["num_nodes"]]
             data[f"bonds_{self.attr_name}"] = d[self.attr_name][
                                               data["atoms"]["num_nodes"]:-data["monosacchs"]["num_nodes"]]
@@ -419,7 +419,7 @@ class MonosaccharidePrediction(RootTransform):
 class PretrainEmbed(RootTransform):
     """Run a GIFFLAR model to embed the input data."""
 
-    def __init__(self, folder: str, dataset_name: str, model_name: str, hash_str: str, **kwargs: Any):
+    def __init__(self, folder: str, dataset_name: str, model_name: str, pooling: str, hash_str: str, **kwargs: Any):
         """
         Set up the Embedding from a pretrained model.
 

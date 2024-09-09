@@ -28,6 +28,7 @@ pre-transforms:
     folder: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_embed/
     model_name: GIFFLAR
     hash_str: 659a0fbd
+    pooling: global_mean
 model:
   - name: mlp
     feat_dim: 1024
