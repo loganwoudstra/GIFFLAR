@@ -27,7 +27,7 @@ pre-transforms:
   PretrainEmbed:
     folder: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_embed/
     model_name: GIFFLAR
-    hash_str: 91710286
+    hash_str: 659a0fbd
 model:
   - name: mlp
     feat_dim: 1024
@@ -38,3 +38,4 @@ model:
     patience: 30
     learning_rate: 0
     optimizer: Adam
+    suffix: _pre_exp

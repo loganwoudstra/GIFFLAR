@@ -209,7 +209,6 @@ def embed(prep_args: dict[str, str], **kwargs: Any) -> None:
     else:
         model.load_state_dict(torch.load(prep_args["ckpt_path"], map_location=torch.device("cpu"))["state_dict"])
     model.eval()
-    model.save_nth_layer(int(prep_args["nth_layer"]))
 
     data_config, data, _, _ = setup(2, **kwargs)
     trainer = Trainer()

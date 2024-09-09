@@ -1,5 +1,5 @@
 seed: 42
-file_path: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_pret/glycans.txt
+file_path: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_pret/expanded_glycans.txt
 logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret
 pre-transforms:
   MonosaccharidePrediction:
@@ -15,10 +15,10 @@ model:
   name: gifflar
   feat_dim: 128
   hidden_dim: 1024
-  batch_size: 256
+  batch_size: 64
   num_layers: 8
   epochs: 100
   learning_rate: 0.001
   optimizer: Adam
   loss: dynamic
-  suffix: _dyn_re
+  suffix: _exp

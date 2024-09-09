@@ -16,9 +16,15 @@ def order_models(name: str) -> tuple:
     if len(parts) == 1:
         return mo,
     parts[1] = appendix_order.get(parts[1], parts[1])
-    res = tuple([mo] + [int(x) for x in parts[1:]])
+    tmp = [mo]
+    for x in parts[1:]:
+        try:
+            tmp.append(int(x))
+        except:
+            tmp.append(x)
+    # return tuple(tmp)
     # print(name, res)
-    return res
+    return tuple(tmp)
 
 
 if len(sys.argv) > 3:
@@ -47,7 +53,12 @@ with pd.ExcelWriter(sys.argv[2] + '.xlsx', engine='xlsxwriter') as writer:
                     res = pd.read_csv(v / "metrics.csv", index_col=0)
                     col = list(filter(lambda x: "val/" in x and metric in x, res.columns))
                     if len(col) != 0:
-                        df.at[name, model] = float(res[col].dropna().max().iloc[0])
+                        if "val/loss" in res.columns:
+                            res.dropna(axis="index", subset=["val/loss"], inplace=True)
+                            row = res["val/loss"].idxmin()
+                            df.at[name, model] = float(res.iloc[row][col].iloc[0])
+                        else:
+                            df.at[name, model] = float(res[col].dropna().max().iloc[0])
         df.to_excel(writer, sheet_name=metric)
 
         workbook = writer.book

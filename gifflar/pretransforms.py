@@ -307,8 +307,8 @@ class LaplacianPE(AddLaplacianEigenvectorPE):
             super(LaplacianPE, self).forward(d)
             data[f"atoms_{self.attr_name}"] = d[self.attr_name][:data["atoms"]["num_nodes"]]
             data[f"bonds_{self.attr_name}"] = d[self.attr_name][
-                                              data["atoms"]["num_nodes"]:data["monosacchs"]["num_nodes"]]
-            data[f"monosacchs_{self.attr_name}"] = d[self.attr_name][data["monosacchs"]["num_nodes"]:]
+                                              data["atoms"]["num_nodes"]:-data["monosacchs"]["num_nodes"]]
+            data[f"monosacchs_{self.attr_name}"] = d[self.attr_name][-data["monosacchs"]["num_nodes"]:]
         return data
 
 
@@ -375,8 +375,8 @@ class RandomWalkPE(RootTransform):
             self.forward(d)
             data[f"atoms_{self.attr_name}"] = d[self.attr_name][:data["atoms"]["num_nodes"]]
             data[f"bonds_{self.attr_name}"] = d[self.attr_name][
-                                              data["atoms"]["num_nodes"]:data["monosacchs"]["num_nodes"]]
-            data[f"monosacchs_{self.attr_name}"] = d[self.attr_name][data["monosacchs"]["num_nodes"]:]
+                                              data["atoms"]["num_nodes"]:-data["monosacchs"]["num_nodes"]]
+            data[f"monosacchs_{self.attr_name}"] = d[self.attr_name][-data["monosacchs"]["num_nodes"]:]
         return data
 
 

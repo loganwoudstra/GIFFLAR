@@ -7,7 +7,7 @@ from glycowork.motif.graph import glycan_to_nxGraph, graph_to_string
 
 glycans_path = Path("glycans.pkl")
 if not glycans_path.exists():
-    import collect_glycan_data
+    import gifflar.acquisition.collect_glycan_data
 
 
 def node_label_hash(label):

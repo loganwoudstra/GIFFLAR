@@ -25,8 +25,8 @@ datasets:
     task: multilabel
 prepare:
   name: GIFFLAR
-  ckpt_path: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret/gifflar_dyn_re_pretrain/version_0/checkpoints/epoch=99-step=6200.ckpt
-  hparams_path: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret/gifflar_dyn_re_pretrain/version_0/hparams.yaml
+  ckpt_path: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret/gifflar_exp_pretrain/version_2/checkpoints/epoch=66-step=84286.ckpt
+  hparams_path: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret/gifflar_exp_pretrain/version_2/hparams.yaml
   save_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_embed/
 pre-transforms:
 model:
