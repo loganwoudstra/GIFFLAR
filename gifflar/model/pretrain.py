@@ -7,6 +7,7 @@ from torch_geometric.nn import HeteroConv
 
 from gifflar.data.hetero import HeteroDataBatch
 from gifflar.loss import MultiLoss
+from gifflar.model.LWCA import LinearWarmupCosineAnnealingLR
 from gifflar.model.base import GlycanGIN
 from gifflar.model.utils import get_prediction_head
 from gifflar.utils import mono_map, bond_map, atom_map
@@ -191,3 +192,19 @@ class PretrainGGIN(GlycanGIN):
         metrics = self.mods_pred_metrics[stage].compute()
         self.log_dict(metrics)
         self.mods_pred_metrics[stage].reset()
+
+    def configure_optimizers(self):
+        """Configure the optimizer and the learning rate scheduler of the model"""
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": LinearWarmupCosineAnnealingLR(
+                optimizer=optimizer,
+                warmup_epochs=25,
+                max_epochs=50,
+                warmup_start_lr=1e-5,
+                eta_min=1e-7,
+            ),
+            "monitor": "val/loss",
+        }
+
