@@ -37,7 +37,8 @@ class DownstreamGGIN(GlycanGIN):
         super().__init__(feat_dim, hidden_dim, num_layers, batch_size, pre_transform_args)
         self.output_dim = output_dim
 
-        self.pooling = GIFFLARPooling()
+        self.pooling = GIFFLARPooling(kwargs.get("pooling", "global_mean"))
+        # self.add_module('pooling', GIFFLARPooling(kwargs.get("pooling", "global_mean")))
         self.task = task
 
         self.head, self.loss, self.metrics = get_prediction_head(hidden_dim, output_dim, task)
@@ -53,6 +54,7 @@ class DownstreamGGIN(GlycanGIN):
             self: The model moved to the specified device
         """
         super(DownstreamGGIN, self).to(device)
+        self.pooling.to(device)
         for split, metric in self.metrics.items():
             self.metrics[split] = metric.to(device)
         return self

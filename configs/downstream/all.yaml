@@ -1,7 +1,7 @@
 seed: 42
 data_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/
-root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_test
-logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_test
+root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_feat
+logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/clean_logs
 datasets:
   - name: Immunogenicity
     task: classification
@@ -9,20 +9,20 @@ datasets:
     task: classification
   - name: Taxonomy_Domain
     task: multilabel
-#  - name: Taxonomy_Kingdom
-#    task: multilabel
-#  - name: Taxonomy_Phylum
-#    task: multilabel
-#  - name: Taxonomy_Class
-#    task: multilabel
-#  - name: Taxonomy_Order
-#    task: multilabel
-#  - name: Taxonomy_Family
-#    task: multilabel
-#  - name: Taxonomy_Genus
-#    task: multilabel
-#  - name: Taxonomy_Species
-#    task: multilabel
+  - name: Taxonomy_Kingdom
+    task: multilabel
+  - name: Taxonomy_Phylum
+    task: multilabel
+  - name: Taxonomy_Class
+    task: multilabel
+  - name: Taxonomy_Order
+    task: multilabel
+  - name: Taxonomy_Family
+    task: multilabel
+  - name: Taxonomy_Genus
+    task: multilabel
+  - name: Taxonomy_Species
+    task: multilabel
 pre-transforms:
 model:
 #  - name: rf
@@ -79,5 +79,5 @@ model:
     epochs: 100
     learning_rate: 0.001
     optimizer: Adam
-    pooling: local_mean
-    suffix: _128_8_local
+    pooling: weighted_attention
+    suffix: _128_8_la_pool

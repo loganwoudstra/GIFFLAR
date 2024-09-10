@@ -68,36 +68,6 @@ model:
     num_layers: 8
     epochs: 100
     learning_rate: 0.001
-    optimizer: Adam
+    optimizer: Adam 
     pooling: weighted_attention
     suffix: _weighted_att
-  - name: gifflar
-    feat_dim: 128
-    hidden_dim: 1024
-    batch_size: 256
-    num_layers: 8
-    epochs: 100
-    learning_rate: 0.001
-    optimizer: Adam
-    pooling: cell_attention
-    suffix: _cell_att
-  - name: gifflar
-    feat_dim: 128
-    hidden_dim: 1024
-    batch_size: 256
-    num_layers: 8
-    epochs: 100
-    learning_rate: 0.001
-    optimizer: Adam
-    pooling: local_cell_attention
-    suffix: _local_cell_att
-  - name: gifflar
-    feat_dim: 128
-    hidden_dim: 1024
-    batch_size: 256
-    num_layers: 8
-    epochs: 100
-    learning_rate: 0.001
-    optimizer: Adam
-    pooling: weighted_cell_attention
-    suffix: _weighted_cell_att
