@@ -161,6 +161,38 @@ class RGCNTransform(RootTransform):
         return data
 
 
+class PyTorchRGCNTransform(RootTransform):
+    def __call__(self, data: HeteroData) -> HeteroData:
+        data["rgcn_x"] = torch.cat([
+            data["atoms"].x,
+            data["bonds"].x,
+            data["monosacchs"].x
+        ])
+        data["rgcn_num_nodes"] = len(data["rgcn_x"])
+        data["rgcn_edge_type"] = torch.tensor(
+            [0] * data["atoms", "coboundary" "atoms"].edge_index.shape[1]
+            + [1] * data["atoms", "to", "bonds"].edge_index.shape[1]
+            + [2] * data["bonds", "boundary", "bonds"].edge_index.shape[1]
+            + [3] * data["bonds", "to", "monosacchs"].edge_index.shape[1]
+            + [4] * data["monosacchs", "boundary", "monosacchs"].edge_index.shape[1]
+        )
+        tmp = []
+        offset = {"atoms": 0,
+                  "bonds": data["atoms"]["num_nodes"],
+                  "monosacchs": data["atoms"]["num_nodes"] + data["bonds"]["num_nodes"]}
+        for key in [("atoms", "coboundary", "atoms"),
+                    ("atoms", "to", "bonds"),
+                    ("bonds", "to", "monosacchs"),
+                    ("bonds", "boundary", "bonds"),
+                    ("monosacchs", "boundary", "monosacchs")]:
+            tmp.append(torch.stack([
+                data[key].edge_index[0] + offset[key[0]],
+                data[key].edge_index[1] + offset[key[2]],
+            ]))
+        data["rgcn_edge_index"] = torch.cat(tmp, dim=1)
+        return data
+
+
 class GNNGLYTransform(RootTransform):
     """Transformation to bring data into a GNNGLY format"""
 
@@ -309,6 +341,12 @@ class LaplacianPE(AddLaplacianEigenvectorPE):
             data[f"bonds_{self.attr_name}"] = d[self.attr_name][
                                               data["atoms"]["num_nodes"]:-data["monosacchs"]["num_nodes"]]
             data[f"monosacchs_{self.attr_name}"] = d[self.attr_name][-data["monosacchs"]["num_nodes"]:]
+
+        if "rgcn_x" in data:
+            data[f"rgcn_{self.attr_name}"] = super(LaplacianPE, self).forward(
+                Data(x=data["rgcn_x"], edge_index=data["rgcn_edge_index"])
+            )[self.attr_name]
+
         return data
 
 
@@ -377,6 +415,10 @@ class RandomWalkPE(RootTransform):
             data[f"bonds_{self.attr_name}"] = d[self.attr_name][
                                               data["atoms"]["num_nodes"]:-data["monosacchs"]["num_nodes"]]
             data[f"monosacchs_{self.attr_name}"] = d[self.attr_name][-data["monosacchs"]["num_nodes"]:]
+        if "rgcn_x" in data:
+            data[f"rgcn_{self.attr_name}"] = self.forward(
+                Data(x=data["rgcn_x"], edge_index=data["rgcn_edge_index"])
+            )[self.attr_name]
         return data
 
 
@@ -492,15 +534,21 @@ def get_pretransforms(dataset_name: str = "", **pre_transform_args: dict[str, di
     Returns:
         A TQDMCompose object containing the pre-transforms.
     """
-    pre_transforms = [
-        GIFFLARTransform(**pre_transform_args.get("GIFFLARTransform", {})),
-        GNNGLYTransform(**pre_transform_args.get("GNNGLYTransform", {})),
-        ECFPTransform(**pre_transform_args.get("ECFPTransform", {})),
-        SweetNetTransform(**pre_transform_args.get("SweetNetTransform", {})),
-        RGCNTransform(),
-    ]
+    pre_transforms = []
     for name, args in pre_transform_args.items():
         match (name):
+            case "GIFFLARTransform":
+                pre_transforms.append(GIFFLARTransform(**args))
+            case "GNNGLYTransform":
+                pre_transforms.append(GNNGLYTransform(**args))
+            case "ECFPTransform":
+                pre_transforms.append(ECFPTransform(**args))
+            case "SweetNetTransform":
+                pre_transforms.append(SweetNetTransform(**args))
+            case "RGCNTransform":
+                pre_transforms.append(RGCNTransform(**args))
+            case "PyTorchRGCNTransform":
+                pre_transforms.append(PyTorchRGCNTransform(**args))
             case "LaplacianPE":
                 pre_transforms.append(LaplacianPE(**args))
             case "RandomWalkPE":

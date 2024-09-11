@@ -10,6 +10,12 @@ datasets:
   - name: Taxonomy_Domain
     task: multilabel
 pre-transforms:
+  GIFFLARTransform:
+  GNNGLYTransform:
+  ECFPTransform:
+  SweetNetTransform:
+  RGCNTransform:
+  PyTorchRGCNTransform:
 model:
   - name: gifflar
     feat_dim: 128

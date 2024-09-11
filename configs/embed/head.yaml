@@ -29,4 +29,10 @@ prepare:
   hparams_path: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret/gifflar_exp_pretrain/version_2/hparams.yaml
   save_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_embed/
 pre-transforms:
+  GIFFLARTransform:
+  GNNGLYTransform:
+  ECFPTransform:
+  SweetNetTransform:
+  RGCNTransform:
+  PyTorchRGCNTransform:
 model:

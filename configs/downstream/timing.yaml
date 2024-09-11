@@ -24,6 +24,12 @@ datasets:
  # - name: Taxonomy_Species
  #   task: multilabel
 pre-transforms:
+  GIFFLARTransform:
+  GNNGLYTransform:
+  ECFPTransform:
+  SweetNetTransform:
+  RGCNTransform:
+  PyTorchRGCNTransform:
   RandomWalkPE:
     dim: 20
     individual: False

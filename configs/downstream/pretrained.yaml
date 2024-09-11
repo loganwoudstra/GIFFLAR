@@ -24,6 +24,12 @@ datasets:
   - name: Taxonomy_Species
     task: multilabel
 pre-transforms:
+  GIFFLARTransform:
+  GNNGLYTransform:
+  ECFPTransform:
+  SweetNetTransform:
+  RGCNTransform:
+  PyTorchRGCNTransform:
   PretrainEmbed:
     folder: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_embed/
     model_name: GIFFLAR

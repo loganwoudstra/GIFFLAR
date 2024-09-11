@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Literal, Optional, Any
 
 import torch
+from pytorch_lightning.utilities.types import LRSchedulerTypeUnion
 from torch_geometric.nn import HeteroConv
 
 from gifflar.data.hetero import HeteroDataBatch
@@ -208,6 +209,8 @@ class PretrainGGIN(GlycanGIN):
             "monitor": "val/loss",
         }
 
+    def lr_scheduler_step(self, scheduler: LRSchedulerTypeUnion, metric: Optional[Any]) -> None:
+        scheduler.step(self.current_epoch)
     def lr_scheduler_step(self, scheduler, metric) -> None:
         scheduler.step(self.current_epoch)
 
