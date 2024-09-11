@@ -170,7 +170,7 @@ class PyTorchRGCNTransform(RootTransform):
         ])
         data["rgcn_num_nodes"] = len(data["rgcn_x"])
         data["rgcn_edge_type"] = torch.tensor(
-            [0] * data["atoms", "coboundary" "atoms"].edge_index.shape[1]
+            [0] * data["atoms", "coboundary", "atoms"].edge_index.shape[1]
             + [1] * data["atoms", "to", "bonds"].edge_index.shape[1]
             + [2] * data["bonds", "boundary", "bonds"].edge_index.shape[1]
             + [3] * data["bonds", "to", "monosacchs"].edge_index.shape[1]
@@ -344,7 +344,7 @@ class LaplacianPE(AddLaplacianEigenvectorPE):
 
         if "rgcn_x" in data:
             data[f"rgcn_{self.attr_name}"] = super(LaplacianPE, self).forward(
-                Data(x=data["rgcn_x"], edge_index=data["rgcn_edge_index"])
+                Data(x=data["rgcn_x"], edge_index=data["rgcn_edge_index"], num_nodes=len(data["rgcn_x"]))
             )[self.attr_name]
 
         return data
@@ -417,7 +417,7 @@ class RandomWalkPE(RootTransform):
             data[f"monosacchs_{self.attr_name}"] = d[self.attr_name][-data["monosacchs"]["num_nodes"]:]
         if "rgcn_x" in data:
             data[f"rgcn_{self.attr_name}"] = self.forward(
-                Data(x=data["rgcn_x"], edge_index=data["rgcn_edge_index"])
+                Data(x=data["rgcn_x"], edge_index=data["rgcn_edge_index"], num_nodes=len(data["rgcn_x"]))
             )[self.attr_name]
         return data
 
@@ -538,25 +538,25 @@ def get_pretransforms(dataset_name: str = "", **pre_transform_args: dict[str, di
     for name, args in pre_transform_args.items():
         match (name):
             case "GIFFLARTransform":
-                pre_transforms.append(GIFFLARTransform(**args))
+                pre_transforms.append(GIFFLARTransform(**args or {}))
             case "GNNGLYTransform":
-                pre_transforms.append(GNNGLYTransform(**args))
+                pre_transforms.append(GNNGLYTransform(**args or {}))
             case "ECFPTransform":
-                pre_transforms.append(ECFPTransform(**args))
+                pre_transforms.append(ECFPTransform(**args or {}))
             case "SweetNetTransform":
-                pre_transforms.append(SweetNetTransform(**args))
+                pre_transforms.append(SweetNetTransform(**args or {}))
             case "RGCNTransform":
-                pre_transforms.append(RGCNTransform(**args))
+                pre_transforms.append(RGCNTransform(**args or {}))
             case "PyTorchRGCNTransform":
-                pre_transforms.append(PyTorchRGCNTransform(**args))
+                pre_transforms.append(PyTorchRGCNTransform(**args or {}))
             case "LaplacianPE":
-                pre_transforms.append(LaplacianPE(**args))
+                pre_transforms.append(LaplacianPE(**args or {}))
             case "RandomWalkPE":
-                pre_transforms.append(RandomWalkPE(**args))
+                pre_transforms.append(RandomWalkPE(**args or {}))
             case "MonosaccharidePrediction":
-                pre_transforms.append(MonosaccharidePrediction(**args))
+                pre_transforms.append(MonosaccharidePrediction(**args or {}))
             case "PretrainEmbed":
-                pre_transforms.append(PretrainEmbed(dataset_name=dataset_name, **args))
+                pre_transforms.append(PretrainEmbed(dataset_name=dataset_name, **args or {}))
             case _:
                 pass
 
