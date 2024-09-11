@@ -208,3 +208,6 @@ class PretrainGGIN(GlycanGIN):
             "monitor": "val/loss",
         }
 
+    def lr_scheduler_step(self, scheduler, metric) -> None:
+        scheduler.step(self.current_epoch)
+
