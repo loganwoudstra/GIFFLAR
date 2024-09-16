@@ -18,11 +18,6 @@ BONDS = {
 
 gs = GlycanStorage("/home/daniel/Data1/roman/GIFFLAR/data_pret")
 
-df_species["ID"] = [f"GID{i + 1:05d}" for i in range(len(df_species))]
-df_species.rename(columns={"glycan": "Glycan"}, inplace=True)
-df_species.drop(columns=[x for x in df_species.columns if x not in {"ID", "Glycan"}], inplace=True)
-
-
 def parse_mono(filepath, iupac):
     mono = dict()
     bonds = set()
@@ -72,34 +67,66 @@ def parse_level(base: Path, prep_folder: Path, level: str, filepath: Path):
     graphs.mkdir(exist_ok=True, parents=True)
     valid = {}
     labels = {}
+    mode = "T"
+    if level == "Immunogenicity":
+        mode = "I"
+        label_map = {}
+        with open(filepath.parent / (filepath.stem + "_classes.tsv"), "r") as f:
+            for line in f.readlines():
+                v, k = line.strip().split("\t")[:2]
+                label_map[int(k)] = "Yes" if float(v) > 0.5 else "No"
+        print(label_map)
+    if level == "Glycosylation":
+        mode = "G"
+        label_map = {}
+        with open(filepath.parent / (filepath.stem + "_classes.tsv"), "r") as f:
+            for line in f.readlines():
+                v, k = line.strip().split("\t")[:2]
+                label_map[int(k)] = v
+        print(label_map)
+
     for split in {"train", "val", "test"}:
         for data in torch.load(prep_folder / f"{split}.pt")[0]:
             valid[data["IUPAC"]] = split
-            labels[data["IUPAC"]] = data["y_oh"]
+            if mode == "T":
+                labels[data["IUPAC"]] = data["y_oh"]
+            else:
+                labels[data["IUPAC"]] = label_map[data["y"].item()]
 
     dataset = pd.read_csv(filepath, sep="\t")
     classes = np.array([x for x in dataset.columns if x not in {"IUPAC", "split"}], dtype=str)
 
-    mask = [False for _ in range(len(df_species))]
-
     monos = dict()
     seen = set()
-    for i, (_, row) in enumerate(df_species.iterrows()):
+    if mode == "T":
+        df_species["ID"] = [f"GID{i + 1:05d}" for i in range(len(df_species))]
+        df_species.rename(columns={"glycan": "Glycan"}, inplace=True)
+        df_species.drop(columns=[x for x in df_species.columns if x not in {"ID", "Glycan"}], inplace=True)
+        df = df_species
+    else:
+        df = dataset
+        df["ID"] = [f"GID{i + 1:05d}" for i in range(len(df))]
+        df.rename(columns={"IUPAC": "Glycan"}, inplace=True)
+        df.drop(columns=[x for x in df.columns if x not in {"ID", "Glycan"}], inplace=True)
+    mask = [False for _ in range(len(df))]
+    
+    for i, (_, row) in enumerate(df.iterrows()):
         print(f"\rParsing {i}", end="")
         if row["Glycan"] not in valid or row["Glycan"] in seen:
             continue
         seen.add(row["Glycan"])
-        if i == 100:
-            break
 
         mask[i] = True
         with open(graphs / f"{row['ID']}_graph.txt", "w") as f:
             monos.update(parse_mono(f, row["Glycan"]))
 
-    df = df_species[mask]
+    df = df[mask]
     df["split"] = df["Glycan"].map(valid)
-    l = torch.cat([labels[x] for x in df["Glycan"].values], dim=0).numpy()
-    df[level] = [", ".join(classes[x.astype(bool)]) for x in l]
+    if mode == "T":
+        l = torch.cat([labels[x] for x in df["Glycan"].values], dim=0).numpy()
+        df[level] = [", ".join(classes[x.astype(bool)]) for x in l]
+    else:
+        df[level] = df["Glycan"].map(labels)
     df.to_csv(base / "multilabel.txt", index=False)
 
     with open(base / "bonds.txt", "w") as f:
