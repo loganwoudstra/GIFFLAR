@@ -44,7 +44,7 @@ def split_hetero_graph(data: HeteroData) -> tuple[Data, Data, Data]:
 def hetero_to_homo(data: HeteroData) -> Data:
     """Convert a heterogeneous graph to a homogeneous by collapsing the node types and removing all node features."""
     bond_edge_index = data["bonds", "boundary", "bonds"]["edge_index"] + data["atoms"]["num_nodes"]
-    monosacchs_edge_index = data["bonds", "boundary", "bonds"]["edge_index"] + data["atoms"]["num_nodes"] + \
+    monosacchs_edge_index = data["monosacchs", "boundary", "monosacchs"]["edge_index"] + data["atoms"]["num_nodes"] + \
                             data["bonds"]["num_nodes"]
     return Data(
         edge_index=torch.cat([
@@ -168,6 +168,7 @@ class PyTorchRGCNTransform(RootTransform):
             data["bonds"].x,
             data["monosacchs"].x
         ])
+        data["rgcn_node_type"] = ["atoms"] * len(data["atoms"].x) + ["bonds"] * len(data["bonds"].x) + ["monosacchs"] * len(data["monosacchs"].x)
         data["rgcn_num_nodes"] = len(data["rgcn_x"])
         data["rgcn_edge_type"] = torch.tensor(
             [0] * data["atoms", "coboundary", "atoms"].edge_index.shape[1]
@@ -327,16 +328,19 @@ class LaplacianPE(AddLaplacianEigenvectorPE):
                     if self.k == 0:
                         d[self.attr_name] = torch.tensor([[]])
                     else:
-                        super(LaplacianPE, self).forward(d)
+                        d = super(LaplacianPE, self).forward(d)
                     pad = torch.zeros(d["num_nodes"], self.max_dim - d[self.attr_name].size(1))
                     d[self.attr_name] = torch.cat([d[self.attr_name], pad], dim=1)
                     self.k = self.max_dim
                 else:
-                    super(LaplacianPE, self).forward(d)
+                    d = super(LaplacianPE, self).forward(d)
                 data[f"{name}_{self.attr_name}"] = d[self.attr_name]
         else:  # or for the whole graph
             d = hetero_to_homo(data)
-            super(LaplacianPE, self).forward(d)
+            if self.k == 0:
+                d[self.attr_name] = torch.tensor([[]])
+            else:
+                d = super(LaplacianPE, self).forward(d)
             data[f"atoms_{self.attr_name}"] = d[self.attr_name][:data["atoms"]["num_nodes"]]
             data[f"bonds_{self.attr_name}"] = d[self.attr_name][
                                               data["atoms"]["num_nodes"]:-data["monosacchs"]["num_nodes"]]

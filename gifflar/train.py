@@ -146,6 +146,7 @@ def train(**kwargs: Any) -> None:
         ],
         max_epochs=kwargs["model"]["epochs"],
         logger=logger,
+        accelerator="cpu",
     )
     start = time.time()
     trainer.fit(model, datamodule)
