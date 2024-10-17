@@ -27,6 +27,12 @@ datasets:
       - reg3
     task: regression
 pre-transforms:
+  GIFFLARTransform:
+  GNNGLYTransform:
+  ECFPTransform:
+  SweetNetTransform:
+  RGCNTransform:
+  PyTorchRGCNTransform:
 model:
   - name: rf
     n_estimators: 500

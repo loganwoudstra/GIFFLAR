@@ -27,6 +27,12 @@ datasets:
       - reg3
     task: regression
 pre-transforms:
+  GIFFLARTransform:
+  GNNGLYTransform:
+  ECFPTransform:
+  SweetNetTransform:
+  RGCNTransform:
+  PyTorchRGCNTransform:
   LaplacianPE:
     dim: 20
   RandomWalkPE:
