@@ -46,6 +46,17 @@ class HeteroDataBatch:
         return getattr(self, item)
 
 
+def determine_concat_dim(tensors):
+    if len(tensors[0].shape) == 1:
+        return 0
+    concat_dim = None
+    if all(tensor.shape[1] == tensors[0].shape[1] for tensor in tensors):
+        concat_dim = 0  # Concatenate along rows (dim 0)
+    elif all(tensor.shape[0] == tensors[0].shape[0] for tensor in tensors):
+        concat_dim = 1  # Concatenate along columns (dim 1)
+    return concat_dim
+
+
 def hetero_collate(data: Optional[Union[list[list[HeteroData]], list[HeteroData]]]) -> HeteroDataBatch:
     """
     Collate a list of HeteroData objects to a batch thereof.
@@ -71,7 +82,7 @@ def hetero_collate(data: Optional[Union[list[list[HeteroData]], list[HeteroData]
     edge_attr_dict = {}
 
     # Include data for the baselines and other kwargs for house-keeping
-    baselines = {"gnngly", "sweetnet"}
+    baselines = {"gnngly", "sweetnet", "rgcn"}
     kwargs = {key: [] for key in dict(data[0]) if all(b not in key for b in baselines)}
 
     # Store the node counts to offset edge indices when collating
@@ -118,16 +129,35 @@ def hetero_collate(data: Optional[Union[list[list[HeteroData]], list[HeteroData]
 
     # For each baseline, collate its node features and edge indices as well
     for b in baselines:
+        break
         kwargs[f"{b}_x"] = torch.cat([d[f"{b}_x"] for d in data], dim=0)
         edges = []
         batch = []
+        e_types = []
+        n_types = []
         node_counts = 0
         for i, d in enumerate(data):
             edges.append(d[f"{b}_edge_index"] + node_counts)
             node_counts += d[f"{b}_num_nodes"]
+            if b == "rgcn":
+                e_types += d["rgcn_edge_type"]
+                n_types += d["rgcn_node_type"]
             batch.append(torch.full((d[f"{b}_num_nodes"],), i, dtype=torch.long))
         kwargs[f"{b}_edge_index"] = torch.cat(edges, dim=1)
         kwargs[f"{b}_batch"] = torch.cat(batch, dim=0)
+        if b == "rgcn":
+            #for d in data:
+            #    print(d["rgcn_x"].shape)
+            #    print(d["rgcn_edge_type"].shape)
+            kwargs["rgcn_edge_type"] = torch.tensor(e_types)
+            kwargs["rgcn_node_type"] = n_types
+            if hasattr(data[0], "rgcn_rw_pe"):
+                kwargs["rgcn_rw_pe"] = torch.cat([d["rgcn_rw_pe"] for d in data], dim=0)
+            if hasattr(data[0], "rgcn_lap_pe"):
+                kwargs["rgcn_lap_pe"] = torch.cat([d["rgcn_lap_pe"] for d in data], dim=0)
+            #print(kwargs["rgcn_x"].shape)
+            #print(kwargs["rgcn_edge_type"].shape)
+            #print(len(kwargs["rgcn_node_type"]))
 
     # Remove all incompletely given data and concat lists of tensors into single tensors
     num_nodes = {node_type: x_dict[node_type].shape[0] for node_type in node_types}
@@ -137,7 +167,10 @@ def hetero_collate(data: Optional[Union[list[list[HeteroData]], list[HeteroData]
         elif len(value) != len(data):
             del kwargs[key]
         elif isinstance(value[0], torch.Tensor):
-            kwargs[key] = torch.cat(value, dim=0)
+            dim = determine_concat_dim(value)
+            if dim is None:
+                raise ValueError(f"Tensors for key {key} cannot be concatenated.")
+            kwargs[key] = torch.cat(value, dim=dim)
 
     # Finally create and return the HeteroDataBatch
     return HeteroDataBatch(x_dict=x_dict, edge_index_dict=edge_index_dict, edge_attr_dict=edge_attr_dict,

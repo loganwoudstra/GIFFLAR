@@ -54,7 +54,8 @@ class DownstreamGGIN(GlycanGIN):
             self: The model moved to the specified device
         """
         super(DownstreamGGIN, self).to(device)
-        self.pooling.to(device)
+        if isinstance(self.pooling, GIFFLARPooling):
+            self.pooling.to(device)
         for split, metric in self.metrics.items():
             self.metrics[split] = metric.to(device)
         return self
