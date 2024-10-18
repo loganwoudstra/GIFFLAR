@@ -4,8 +4,8 @@ rdkit>=2022
 scikit-learn
 numpy
 pandas
-git+https://github.com/KalininaLab/glyles.git
-git+https://github.com/BojarLab/glycowork.git@3b8a6619ecc4b256cb28b43a47f17ef7df0ecaf3
+glyles
+git+https://github.com/BojarLab/glycowork.git@1123e1cee9f189ea5e82c6c1cda9764749b6da36
 jsonargparse
 rich
 pytorch-lightning

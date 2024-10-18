@@ -51,7 +51,7 @@ def setup(count: int = 4, **kwargs: Any) -> tuple[dict, DownsteamGDM, Logger | N
     seed_everything(kwargs["seed"])
 
     # set up the data module
-    data_config = get_dataset(kwargs["dataset"])
+    data_config = get_dataset(kwargs["dataset"], kwargs["root_dir"])
     datamodule = DownsteamGDM(
         root=kwargs["root_dir"], filename=data_config["filepath"], hash_code=kwargs["hash"],
         batch_size=kwargs["model"].get("batch_size", 1), transform=None,

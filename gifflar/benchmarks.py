@@ -10,14 +10,17 @@ from tqdm import tqdm
 from gifflar.utils import iupac2smiles
 
 
-def get_taxonomy() -> pd.DataFrame:
+def get_taxonomy(root: Path | str) -> pd.DataFrame:
     """
     Download full taxonomy data, process it, and save it as a tsv file.
+
+    Args:
+        root: The root directory to save the data to.
 
     Returns:
         The processed taxonomy data.
     """
-    if not (p := Path("taxonomy.tsv")).exists():
+    if not (p := (root / Path("taxonomy.tsv"))).exists():
         mask = []
         # convert to IUPAC to SMILES and build a mask to remove not-convertable molecules.
         for i in tqdm(taxonomy["glycan"]):
@@ -29,18 +32,20 @@ def get_taxonomy() -> pd.DataFrame:
 
 
 def get_taxonomic_level(
+        root: Path | str,
         level: Literal["Domain", "Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"]
 ) -> Path:
     """
     Extract taxonomy data at a specific level, process it, and save it as a tsv file.
 
     Args:
+        root: The root directory to save the data to.
         level: The taxonomic level to extract the data from.
 
     Returns:
         Path to the TSV file storing the processed dataset.
     """
-    if not (p := Path(f"taxonomy_{level}.tsv")).exists():
+    if not (p := (root / Path(f"taxonomy_{level}.tsv"))).exists():
         # Chop to taxonomic level of interest and remove invalid rows
         tax = get_taxonomy()[["glycan", level]]
         tax.rename(columns={"glycan": "IUPAC"}, inplace=True)
@@ -66,14 +71,17 @@ def get_taxonomic_level(
     return p
 
 
-def get_immunogenicity() -> Path:
+def get_immunogenicity(root: Path | str) -> Path:
     """
     Download immunogenicity data, process it, and save it as a tsv file.
+
+    Args:
+        root: The root directory to save the data to.
 
     Returns:
         The filepath of the processed immunogenicity data.
     """
-    if not (p := Path("immunogenicity.tsv")).exists():
+    if not (p := (root / Path("immunogenicity.tsv"))).exists():
         # Download the data
         urllib.request.urlretrieve(
             "https://torchglycan.s3.us-east-2.amazonaws.com/downstream/glycan_immunogenicity.csv",
@@ -98,9 +106,12 @@ def get_immunogenicity() -> Path:
     return p
 
 
-def get_glycosylation() -> Path:
+def get_glycosylation(root: Path | str) -> Path:
     """
     Download glycosylation data, process it, and save it as a tsv file.
+
+    Args:
+        root: The root directory to save the data to.
 
     Returns:
         The filepath of the processed glycosylation data.
@@ -126,12 +137,13 @@ def get_glycosylation() -> Path:
     return p
 
 
-def get_dataset(data_config) -> dict:
+def get_dataset(data_config: dict, root: Path | str) -> dict:
     """
     Get the dataset based on the configuration.
 
     Args:
         data_config: The configuration of the dataset.
+        root: The root directory to save the data to.
 
     Returns:
         The configuration of the dataset with the filepath added and made sure the dataset is preprocessed
@@ -139,16 +151,16 @@ def get_dataset(data_config) -> dict:
     name_fracs = data_config["name"].split("_")
     match name_fracs[0]:
         case "Taxonomy":
-            path = get_taxonomic_level(name_fracs[1])
+            path = get_taxonomic_level(root, name_fracs[1])
         case "Immunogenicity":
-            path = get_immunogenicity()
+            path = get_immunogenicity(root)
         case "Glycosylation":
-            path = get_glycosylation()
+            path = get_glycosylation(root)
         case "class-1" | "class-n" | "multilabel" | "reg-1" | "reg-n":  # Used for testing
-            root = Path("dummy_data")
-            if not root.is_dir():
-                root = "tests" / root
-            path = root / f"{name_fracs[0].replace('-', '_')}.csv"
+            base = Path("dummy_data")
+            if not base.is_dir():
+                base = "tests" / base
+            path = base / f"{name_fracs[0].replace('-', '_')}.csv"
         case _:  # Unknown dataset
             raise ValueError(f"Unknown dataset {data_config['name']}.")
     data_config["filepath"] = path

@@ -210,6 +210,6 @@ def bpe_tokenize(text, merges):
 
 
 tg = TokenizerGIFFLAR("gifflar/grammar/tokens.txt")
-base_vocab_test, merges_test = bpe(corpus_path="glycans_100.txt", num_token=50)
+base_vocab_test, merges_test = bpe(corpus_path="datasets/pretrain/glycans_100.txt", num_token=50)
 print(bpe_tokenize("NeuNAc(a2-3)Gal(b1-4)GlcNAc(b1-2)Man(a1-3)[Man(a1-3)Man(a1-6)]Man(b1-4)GlcNAc(b1-4)GlcNAc",
                    merges_test))

@@ -1,5 +1,4 @@
 seed: 42
-data_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/
 root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_test
 logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pool
 datasets:

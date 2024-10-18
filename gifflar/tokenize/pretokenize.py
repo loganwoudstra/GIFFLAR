@@ -2,8 +2,8 @@ import networkx as nx
 from antlr4.CommonTokenStream import CommonTokenStream
 from antlr4.InputStream import InputStream
 
-from gifflar.grammar.GIFFLARLexer import GIFFLARLexer
-from gifflar.grammar.GIFFLARParser import GIFFLARParser
+from glyles.grammar.GlycanLexer import GlycanLexer
+from glyles.grammar.GlycanParser import GlycanParser
 
 
 def graph_to_token_stream_int(graph):
@@ -126,6 +126,6 @@ class GlycoworkPreTokenizer(PreTokenizer):
 class GrammarPreTokenizer(PreTokenizer):
     def __call__(self, iupac: str):
         iupac = iupac.strip().replace(" ", "")
-        token = CommonTokenStream(GIFFLARLexer(InputStream(data="{" + iupac + "}")))
-        GIFFLARParser(token).start()
+        token = CommonTokenStream(GlycanLexer(InputStream(data="{" + iupac + "}")))
+        GlycanParser(token).start()
         return [t.text for t in token.tokens[1:-2]]
