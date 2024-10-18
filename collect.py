@@ -65,7 +65,11 @@ with pd.ExcelWriter(sys.argv[2] + '.xlsx', engine='xlsxwriter') as writer:
         worksheet = writer.sheets[metric]
         bold_format = workbook.add_format({"bold": True})
         for r, (_, row) in enumerate(df.iterrows()):
-            max_val = row.values.max()
-            for c, val in enumerate(row.values):
-                if val == max_val:
-                    worksheet.write(r + 1, c + 1, val, bold_format)
+            try:
+                max_val = row.values.max()
+                for c, val in enumerate(row.values):
+                    if val == max_val:
+                        worksheet.write(r + 1, c + 1, val, bold_format)
+            except:
+                pass
+

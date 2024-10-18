@@ -1,8 +1,9 @@
 .idea/*
 logs/*
 data/*
-gifflar/.ipynb_checkpoints/*
+**/.ipynb_checkpoints/
 *.ipynb
 *.tsv
 tests/data/*
 tests/logs/*
+**/__pycache__/

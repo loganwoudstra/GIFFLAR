@@ -170,13 +170,10 @@ class PyTorchRGCNTransform(RootTransform):
         ])
         data["rgcn_node_type"] = ["atoms"] * len(data["atoms"].x) + ["bonds"] * len(data["bonds"].x) + ["monosacchs"] * len(data["monosacchs"].x)
         data["rgcn_num_nodes"] = len(data["rgcn_x"])
-        data["rgcn_edge_type"] = torch.tensor(
-            [0] * data["atoms", "coboundary", "atoms"].edge_index.shape[1]
-            + [1] * data["atoms", "to", "bonds"].edge_index.shape[1]
-            + [2] * data["bonds", "boundary", "bonds"].edge_index.shape[1]
-            + [3] * data["bonds", "to", "monosacchs"].edge_index.shape[1]
-            + [4] * data["monosacchs", "boundary", "monosacchs"].edge_index.shape[1]
-        )
+        tmp = [0] * data["atoms", "coboundary", "atoms"].edge_index.shape[1] + [1] * data["atoms", "to", "bonds"].edge_index.shape[1] + [2] * data["bonds", "boundary", "bonds"].edge_index.shape[1] + [3] * data["bonds", "to", "monosacchs"].edge_index.shape[1]
+        if len(data["monosacchs"].x) > 1:
+            tmp += [4] * data["monosacchs", "boundary", "monosacchs"].edge_index.shape[1]
+        data["rgcn_edge_type"] = torch.tensor(tmp)
         tmp = []
         offset = {"atoms": 0,
                   "bonds": data["atoms"]["num_nodes"],
@@ -186,10 +183,11 @@ class PyTorchRGCNTransform(RootTransform):
                     ("bonds", "to", "monosacchs"),
                     ("bonds", "boundary", "bonds"),
                     ("monosacchs", "boundary", "monosacchs")]:
-            tmp.append(torch.stack([
-                data[key].edge_index[0] + offset[key[0]],
-                data[key].edge_index[1] + offset[key[2]],
-            ]))
+            if len(data[key].edge_index.shape) == 2:
+                tmp.append(torch.stack([
+                    data[key].edge_index[0] + offset[key[0]],
+                    data[key].edge_index[1] + offset[key[2]],
+                ]))
         data["rgcn_edge_index"] = torch.cat(tmp, dim=1)
         return data
 
