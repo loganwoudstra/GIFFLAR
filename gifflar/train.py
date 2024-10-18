@@ -173,6 +173,7 @@ def pretrain(**kwargs: Any) -> None:
     logger.log_hyperparams(kwargs)
 
     trainer = Trainer(
+        devices=[1],
         callbacks=[
             ModelCheckpoint(save_top_k=-1),
             RichModelSummary(),

@@ -2,8 +2,8 @@
 logs/*
 data/*
 **/.ipynb_checkpoints/
+**/__pycache__/
 *.ipynb
 *.tsv
 tests/data/*
 tests/logs/*
-**/__pycache__/
