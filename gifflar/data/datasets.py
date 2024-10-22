@@ -1,3 +1,4 @@
+import pickle
 from pathlib import Path
 from typing import Union, Optional, Callable, Any
 
@@ -201,6 +202,31 @@ class DownstreamGDs(GlycanDataset):
                     d["y"] = d["y_oh"].argmax().item()
             d["ID"] = index
             data[row["split"]].append(d)
+
+        gs.close()
+        print("Processed", sum(len(v) for v in data.values()), "entries")
+        for split in self.splits:
+            self.process_(data[split], path_idx=self.splits[split])
+
+
+class LGIDataset(DownstreamGDs):
+    def process(self) -> None:
+        """Process the data and store it."""
+        print("Start processing")
+        data = {k: [] for k in self.splits}
+        with open(self.filename, "r") as f:
+            inter, lectin_map, glycan_map = pickle.load(f)
+
+        # Load the glycan storage to speed up the preprocessing
+        gs = GlycanStorage(Path(self.root).parent)
+        for i, (lectin_id, glycan_id, value, split) in tqdm(enumerate(inter)):
+            d = gs.query(glycan_map[glycan_id])
+            if d is None:
+                continue
+            d["aa_seq"] = lectin_map[lectin_id]
+            d["y"] = torch.tensor(value)
+            d["ID"] = i
+            data[split].append(d)
 
         gs.close()
         print("Processed", sum(len(v) for v in data.values()), "entries")

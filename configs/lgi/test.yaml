@@ -1,0 +1,18 @@
+seed: 42
+root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data
+logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs
+origin: path/to/dataset
+model:
+  glycan_encoder:
+    name: gifflar
+    feat_dim: 128
+    hidden_dim: 1024
+    batch_size: 256
+    num_layers: 8
+    pooling: global_pool
+  lectin_encoder:
+    name: esm
+    layer_num: 11
+  epochs: 100
+  learning_rate: 0.001
+  optimizer: Adam

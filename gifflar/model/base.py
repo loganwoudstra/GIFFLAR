@@ -20,7 +20,7 @@ PRE_TRANSFORMS = {
 
 class GlycanGIN(LightningModule):
     def __init__(self, feat_dim: int, hidden_dim: int, num_layers: int, batch_size: int = 32,
-                 pre_transform_args: Optional[dict] = None):
+                 pre_transform_args: Optional[dict] = None, **kwargs: Any):
         """
         Initialize the GlycanGIN model, the base for all DL-models in this package
 
@@ -29,6 +29,7 @@ class GlycanGIN(LightningModule):
             hidden_dim: The hidden dimension of the model
             num_layers: The number of GIN layers to use
             pre_transform_args: A dictionary of pre-transforms to apply to the input data
+            kwargs: Additional arguments (ignored)
         """
         super().__init__()
 

@@ -60,13 +60,13 @@ def setup(count: int = 4, **kwargs: Any) -> tuple[dict, DownsteamGDM, Logger | N
         pre_transform=get_pretransforms(data_config["name"], **(kwargs["pre-transforms"] or {})), **data_config,
     )
     data_config["num_classes"] = datamodule.train.dataset_args["num_classes"]
+    kwargs["dataset"]["filepath"] = str(data_config["filepath"])
 
     if count == 2:
         return data_config, datamodule, None, None
 
     # set up the logger
     logger = CSVLogger(kwargs["logs_dir"], name=kwargs["model"]["name"] + (kwargs["model"].get("suffix", None) or ""))
-    kwargs["dataset"]["filepath"] = str(data_config["filepath"])
     logger.log_hyperparams(kwargs)
 
     if count == 3:
