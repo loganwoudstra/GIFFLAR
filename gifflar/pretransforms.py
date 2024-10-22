@@ -137,32 +137,6 @@ class GIFFLARTransform(RootTransform):
 
 class RGCNTransform(RootTransform):
     def __call__(self, data: HeteroData) -> HeteroData:
-        """
-        Add self-loops to the graph for the RGCN model.
-
-        Args:
-            data: The input data to be transformed.
-
-        Returns:
-            The transformed data.
-        """
-        data["atoms", "self", "atoms"].edge_index = torch.stack([
-            torch.arange(data["atoms"]["num_nodes"]),
-            torch.arange(data["atoms"]["num_nodes"])
-        ])
-        data["bonds", "self", "bonds"].edge_index = torch.stack([
-            torch.arange(data["bonds"]["num_nodes"]),
-            torch.arange(data["bonds"]["num_nodes"])
-        ])
-        data["monosacchs", "self", "monosacchs"].edge_index = torch.stack([
-            torch.arange(data["monosacchs"]["num_nodes"]),
-            torch.arange(data["monosacchs"]["num_nodes"])
-        ])
-        return data
-
-
-class PyTorchRGCNTransform(RootTransform):
-    def __call__(self, data: HeteroData) -> HeteroData:
         data["rgcn_x"] = torch.cat([
             data["atoms"].x,
             data["bonds"].x,
@@ -557,8 +531,6 @@ def get_pretransforms(dataset_name: str = "", **pre_transform_args: dict[str, di
                 pre_transforms.append(SweetNetTransform(**args or {}))
             case "RGCNTransform":
                 pre_transforms.append(RGCNTransform(**args or {}))
-            case "PyTorchRGCNTransform":
-                pre_transforms.append(PyTorchRGCNTransform(**args or {}))
             case "LaplacianPE":
                 pre_transforms.append(LaplacianPE(**args or {}))
             case "RandomWalkPE":

@@ -1,3 +1,6 @@
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
 from pathlib import Path
 from typing import Any
 import time
@@ -13,7 +16,7 @@ from torch_geometric import seed_everything
 from gifflar.data.modules import DownsteamGDM, PretrainGDM
 from gifflar.model.baselines.gnngly import GNNGLY
 from gifflar.model.baselines.mlp import MLP
-from gifflar.model.baselines.rgcn import RGCN, PyTorchRGCN
+from gifflar.model.baselines.rgcn import RGCN
 from gifflar.model.baselines.sweetnet import SweetNetLightning
 from gifflar.benchmarks import get_dataset
 from gifflar.model.downstream import DownstreamGGIN
@@ -29,7 +32,6 @@ MODELS = {
     "gnngly": GNNGLY,
     "mlp": MLP,
     "rgcn": RGCN,
-    "pyrgcn": PyTorchRGCN,
     "sweetnet": SweetNetLightning,
 }
 

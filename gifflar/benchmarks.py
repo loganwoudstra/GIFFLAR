@@ -47,7 +47,7 @@ def get_taxonomic_level(
     """
     if not (p := (root / Path(f"taxonomy_{level}.tsv"))).exists():
         # Chop to taxonomic level of interest and remove invalid rows
-        tax = get_taxonomy()[["glycan", level]]
+        tax = get_taxonomy(root)[["glycan", level]]
         tax.rename(columns={"glycan": "IUPAC"}, inplace=True)
         tax[tax[level] == "undetermined"] = np.nan
         tax.dropna(inplace=True)
@@ -148,6 +148,7 @@ def get_dataset(data_config: dict, root: Path | str) -> dict:
     Returns:
         The configuration of the dataset with the filepath added and made sure the dataset is preprocessed
     """
+    Path(root).mkdir(exist_ok=True, parents=True)
     name_fracs = data_config["name"].split("_")
     match name_fracs[0]:
         case "Taxonomy":

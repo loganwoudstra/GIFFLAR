@@ -129,7 +129,6 @@ def hetero_collate(data: Optional[Union[list[list[HeteroData]], list[HeteroData]
 
     # For each baseline, collate its node features and edge indices as well
     for b in baselines:
-        break
         kwargs[f"{b}_x"] = torch.cat([d[f"{b}_x"] for d in data], dim=0)
         edges = []
         batch = []
