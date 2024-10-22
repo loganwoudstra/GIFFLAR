@@ -5,7 +5,7 @@ import torch
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import ConcatDataset, DataLoader
 
-from gifflar.data.datasets import DownstreamGDs, PretrainGDs
+from gifflar.data.datasets import DownstreamGDs, PretrainGDs, LGIDataset
 from gifflar.data.hetero import hetero_collate
 
 
@@ -103,6 +103,8 @@ class PretrainGDM(GlycanDataModule):
 class DownsteamGDM(GlycanDataModule):
     """DataModule for downstream tasks on glycan data."""
 
+    ds_class = DownstreamGDs
+
     def __init__(
             self,
             root: str | Path,
@@ -126,15 +128,18 @@ class DownsteamGDM(GlycanDataModule):
             **dataset_args: Additional arguments to pass to the DownstreamGDs
         """
         super().__init__(batch_size)
-        self.train = DownstreamGDs(
+        self.train = self.ds_class(
             root=root, filename=filename, split="train", hash_code=hash_code, transform=transform,
             pre_transform=pre_transform, **dataset_args,
         )
-        self.val = DownstreamGDs(
+        self.val = self.ds_class(
             root=root, filename=filename, split="val", hash_code=hash_code, transform=transform,
             pre_transform=pre_transform, **dataset_args,
         )
-        self.test = DownstreamGDs(
+        self.test = self.ds_class(
             root=root, filename=filename, split="test", hash_code=hash_code, transform=transform,
             pre_transform=pre_transform, **dataset_args,
         )
+
+class LGI_GDM(DownsteamGDM):
+    ds_class = LGIDataset
