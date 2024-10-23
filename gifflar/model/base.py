@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal, Optional, Any
 
 import torch
 from glycowork.glycan_data.loader import lib
@@ -67,7 +67,7 @@ class GlycanGIN(LightningModule):
                     ("monosacchs", "boundary", "monosacchs")
                 ]
             }))
-
+        self.hidden_dim = hidden_dim
         self.batch_size = batch_size
 
     def forward(self, batch: HeteroDataBatch) -> dict[str, torch.Tensor]:

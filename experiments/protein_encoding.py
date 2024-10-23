@@ -12,7 +12,7 @@ class PLMEncoder:
         pass
 
     def __call__(self, *args, **kwargs):
-        self.forward(*args, **kwargs)
+        return self.forward(*args, **kwargs)
 
 
 class Ankh(PLMEncoder):
@@ -36,25 +36,27 @@ class Ankh(PLMEncoder):
                 output_attentions=False,
                 output_hidden_states=True,
             )
-        return ankh.hidden_states[self.layer_num][:, :-1].mean(dim=2)[0]
+        return ankh.hidden_states[self.layer_num][:, :-1].mean(dim=1)[0]
 
 
 class ESM(PLMEncoder):
     def __init__(self, layer_num: int):
         super().__init__(layer_num)
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.tokenizer = AutoTokenizer.from_pretrained("facebook/esm2_t33_650M_UR50D")
-        self.model = AutoModel.from_pretrained("facebook/esm2_t33_650M_UR50D")
+        self.model = AutoModel.from_pretrained("facebook/esm2_t33_650M_UR50D").to(self.device)
 
     def forward(self, seq: str) -> torch.Tensor:
         a = self.tokenizer(seq)
         with torch.no_grad():
             esm = self.model(
-                torch.Tensor(a["input_ids"]).long().reshape(1, -1),
-                torch.Tensor(a["attention_mask"]).long().reshape(1, -1),
+                torch.Tensor(a["input_ids"]).long().reshape(1, -1).to(self.device),
+                torch.Tensor(a["attention_mask"]).long().reshape(1, -1).to(self.device),
                 output_attentions=False,
                 output_hidden_states=True,
             )
-        return esm.hidden_states[self.layer_num][:, 1:-1].mean(dim=2)[0]
+        print(seq)
+        return esm.hidden_states[self.layer_num][:, 1:-1].mean(dim=1)[0]
 
 
 class ProtBERT(PLMEncoder):

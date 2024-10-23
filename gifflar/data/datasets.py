@@ -214,7 +214,7 @@ class LGIDataset(DownstreamGDs):
         """Process the data and store it."""
         print("Start processing")
         data = {k: [] for k in self.splits}
-        with open(self.filename, "r") as f:
+        with open(self.filename, "rb") as f:
             inter, lectin_map, glycan_map = pickle.load(f)
 
         # Load the glycan storage to speed up the preprocessing
@@ -224,7 +224,7 @@ class LGIDataset(DownstreamGDs):
             if d is None:
                 continue
             d["aa_seq"] = lectin_map[lectin_id]
-            d["y"] = torch.tensor(value)
+            d["y"] = torch.tensor([value])
             d["ID"] = i
             data[split].append(d)
 

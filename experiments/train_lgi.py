@@ -1,3 +1,6 @@
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
 from argparse import ArgumentParser
 import time
 
@@ -36,21 +39,24 @@ def main(config):
     )
 
     # set up the logger
-    logger = CSVLogger(kwargs["logs_dir"], name=kwargs["model"]["name"] + (kwargs["model"].get("suffix", None) or ""))
+    glycan_model_name = kwargs["model"]["glycan_encoder"]["name"] + (kwargs["model"]["glycan_encoder"].get("suffix", None) or "")
+    lectin_model_name = kwargs["model"]["lectin_encoder"]["name"] + (kwargs["model"]["lectin_encoder"].get("suffix", None) or "")
+    logger = CSVLogger(kwargs["logs_dir"], name="LGI_" + glycan_model_name + lectin_model_name)
     logger.log_hyperparams(kwargs)
 
     glycan_encoder = GLYCAN_ENCODERS[kwargs["model"]["glycan_encoder"]["name"]](**kwargs["model"]["glycan_encoder"])
     model = LGI_Model(
         glycan_encoder,
         kwargs["model"]["lectin_encoder"]["name"],
-        kwargs["model"]["lectin_encoder"]["le_layer_num"],
+        kwargs["model"]["lectin_encoder"]["layer_num"],
     )
-
+    model.to("cuda")
+    
     trainer = Trainer(
         callbacks=[RichProgressBar(), RichModelSummary()],
         logger=logger,
-        max_epochs=kwargs["model"]["max_epochs"],
-        accelerator="cpu",
+        max_epochs=kwargs["model"]["epochs"],
+        accelerator="gpu",
     )
     start = time.time()
     trainer.fit(model, datamodule)

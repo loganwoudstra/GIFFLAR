@@ -1,7 +1,7 @@
 seed: 42
 root_dir: /home/daniel/Data1/roman/GIFFLAR/lgi_data
 logs_dir: /home/daniel/Data1/roman/GIFFLAR/lgi_logs
-origin: /home/daniel/Desktop/GIFFLAR/lgi_data.pkl
+origin: /home/daniel/Desktop/GIFFLAR/lgi_data_full.pkl
 model:
   glycan_encoder:
     name: gifflar
@@ -13,7 +13,7 @@ model:
     name: ESM
     layer_num: 33
   batch_size: 256
-  epochs: 5
+  epochs: 100
   learning_rate: 0.001
   optimizer: Adam
 

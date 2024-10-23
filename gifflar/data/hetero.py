@@ -84,14 +84,18 @@ def hetero_collate(data: Optional[Union[list[list[HeteroData]], list[HeteroData]
     # Include data for the baselines and other kwargs for house-keeping
     baselines = {"gnngly", "sweetnet", "rgcn"}
     kwargs = {key: [] for key in dict(data[0]) if all(b not in key for b in baselines)}
+    # print([d["y"] for d in data])
 
     # Store the node counts to offset edge indices when collating
     node_counts = {node_type: [0] for node_type in node_types}
     for d in data:
         for key in kwargs:
             # Collect all length-queryable fields
-            if not hasattr(d[key], "__len__") or len(d[key]) != 0:
-                kwargs[key].append(d[key])
+            try:
+                if not hasattr(d[key], "__len__") or len(d[key]) != 0:
+                    kwargs[key].append(d[key])
+            except:
+                pass
 
         # Compute the offsets for each node type for sample identification after batching
         for node_type in node_types:
@@ -129,6 +133,8 @@ def hetero_collate(data: Optional[Union[list[list[HeteroData]], list[HeteroData]
 
     # For each baseline, collate its node features and edge indices as well
     for b in baselines:
+        if not f"{b}_num_nodes" in data[0]:
+            continue
         kwargs[f"{b}_x"] = torch.cat([d[f"{b}_x"] for d in data], dim=0)
         edges = []
         batch = []
@@ -145,18 +151,12 @@ def hetero_collate(data: Optional[Union[list[list[HeteroData]], list[HeteroData]
         kwargs[f"{b}_edge_index"] = torch.cat(edges, dim=1)
         kwargs[f"{b}_batch"] = torch.cat(batch, dim=0)
         if b == "rgcn":
-            #for d in data:
-            #    print(d["rgcn_x"].shape)
-            #    print(d["rgcn_edge_type"].shape)
             kwargs["rgcn_edge_type"] = torch.tensor(e_types)
             kwargs["rgcn_node_type"] = n_types
             if hasattr(data[0], "rgcn_rw_pe"):
                 kwargs["rgcn_rw_pe"] = torch.cat([d["rgcn_rw_pe"] for d in data], dim=0)
             if hasattr(data[0], "rgcn_lap_pe"):
                 kwargs["rgcn_lap_pe"] = torch.cat([d["rgcn_lap_pe"] for d in data], dim=0)
-            #print(kwargs["rgcn_x"].shape)
-            #print(kwargs["rgcn_edge_type"].shape)
-            #print(len(kwargs["rgcn_node_type"]))
 
     # Remove all incompletely given data and concat lists of tensors into single tensors
     num_nodes = {node_type: x_dict[node_type].shape[0] for node_type in node_types}

@@ -22,6 +22,7 @@ class LectinStorage(GlycanStorage):
                 otherwise, such file will be created.
         """
         self.path = Path(path or "data") / f"{lectin_encoder}_{le_layer_num}.pkl"
+        print("Path:", self.path.resolve())
         self.encoder = ENCODER_MAP[lectin_encoder](le_layer_num)
         self.data = self._load()
 
@@ -31,7 +32,12 @@ class LectinStorage(GlycanStorage):
                 self.data[aa_seq] = self.encoder(aa_seq)
             except:
                 self.data[aa_seq] = None
+
         return self.data[aa_seq]
+
+    def batch_query(self, aa_seqs) -> torch.Tensor:
+        # print([self.query(aa_seq) for aa_seq in aa_seqs])
+        return torch.stack([self.query(aa_seq) for aa_seq in aa_seqs])
 
 
 class LGI_Model(LightningModule):
@@ -62,18 +68,26 @@ class LGI_Model(LightningModule):
 
         self.head, self.loss, self.metrics = get_prediction_head(self.combined_dim, 1, "regression")
 
+    def to(self, device: torch.device):
+        super(LGI_Model, self).to(device)
+        self.glycan_encoder.to(device)
+        self.glycan_pooling.to(device)
+        self.head.to(device)
+        for split, metric in self.metrics.items():
+            self.metrics[split] = metric.to(device)
+
     def forward(self, data: HeteroData) -> dict[str, torch.Tensor]:
         glycan_node_embed = self.glycan_encoder(data)
         glycan_graph_embed = self.glycan_pooling(glycan_node_embed, data.batch_dict)
-        lectin_embed = self.lectin_embeddings.query(data["aa_seq"])
+        lectin_embed = self.lectin_embeddings.batch_query(data["aa_seq"])
         combined = torch.cat([glycan_graph_embed, lectin_embed], dim=-1)
         pred = self.head(combined)
 
         return {
-            "glycan_node_embed": glycan_node_embed,
-            "glycan_graph_embed": glycan_graph_embed,
-            "lectin_embed": lectin_embed,
-            "pred": pred,
+            "glycan_node_embeds": glycan_node_embed,
+            "glycan_graph_embeds": glycan_graph_embed,
+            "lectin_embeds": lectin_embed,
+            "preds": pred,
         }
 
     def shared_step(self, batch: HeteroData, stage: str) -> dict[str, torch.Tensor]:
@@ -88,10 +102,11 @@ class LGI_Model(LightningModule):
             A dictionary containing the loss and the metrics
         """
         fwd_dict = self(batch)
-        fwd_dict["labels"] = batch["y"]
-        fwd_dict["loss"] = self.loss(fwd_dict["pred"], fwd_dict["label"])
-        self.metrics[stage].update(fwd_dict["pred"], fwd_dict["label"])
-        self.log(f"{stage}/loss", fwd_dict["loss"])
+        fwd_dict["labels"] = batch["y"]# .reshape(-1)
+        fwd_dict["preds"] = fwd_dict["preds"].reshape(-1)
+        fwd_dict["loss"] = self.loss(fwd_dict["preds"], fwd_dict["labels"])
+        self.metrics[stage].update(fwd_dict["preds"], fwd_dict["labels"])
+        self.log(f"{stage}/loss", fwd_dict["loss"], batch_size=len(fwd_dict["preds"]))
 
         return fwd_dict
 
