@@ -1,4 +1,5 @@
 import pickle
+import random
 
 from tqdm import tqdm
 import numpy as np
@@ -22,6 +23,8 @@ splits = np.random.choice(["train", "val", "test"], len(s), p=[0.7, 0.2, 0.1])
 for i, ((aa_seq, iupac), val) in tqdm(enumerate(s.items())):
     data.append((lectins[aa_seq], glycans[iupac], val, splits[i]))
 
-with open("lgi_data_full.pkl", "wb") as f:
+data = random.sample(data, int(len(data) * 0.20))
+
+with open("lgi_data_20.pkl", "wb") as f:
     pickle.dump((data, lectins, glycans), f)
 

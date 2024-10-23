@@ -4,8 +4,8 @@ rdkit>=2022
 scikit-learn
 numpy
 pandas
-glyles
-git+https://github.com/BojarLab/glycowork.git@1123e1cee9f189ea5e82c6c1cda9764749b6da36
+glyles>=1.0.0
+git+https://github.com/BojarLab/glycowork.git@145877da82cf0200b062945dfb85584b9d9ef30d
 jsonargparse
 rich
 pytorch-lightning
@@ -13,3 +13,6 @@ pytest
 pyyaml
 networkx
 torchmetrics
+transformers
+sentencepiece
+xformers==0.0.28.post1

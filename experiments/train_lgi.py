@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 from argparse import ArgumentParser
 import time
@@ -19,6 +19,8 @@ from gifflar.pretransforms import get_pretransforms
 from gifflar.train import setup
 from gifflar.utils import read_yaml_config, hash_dict
 
+import torch
+print(torch.cuda.is_available())
 
 GLYCAN_ENCODERS = {
     "gifflar": GlycanGIN,
@@ -26,8 +28,28 @@ GLYCAN_ENCODERS = {
 }
 
 
-def main(config):
-    kwargs = read_yaml_config(config)
+def unfold_config(config: dict):
+    if isinstance(config["model"]["glycan_encoder"], dict):
+        ges = [config["model"]["glycan_encoder"]]
+    else:
+        ges = config["model"]["glycan_encoder"]
+    del config["model"]["glycan_encoder"]
+
+    if isinstance(config["model"]["lectin_encoder"], dict):
+        les = [config["model"]["lectin_encoder"]]
+    else:
+        les = config["model"]["lectin_encoder"]
+    del config["model"]["lectin_encoder"]
+
+    for le in les:
+        for ge in ges:
+            tmp_config = copy.deepcopy(config)
+            tmp_config["model"]["lectin_encoder"] = le
+            tmp_config["model"]["glycan_encoder"] = ge
+            yield tmp_config
+
+
+def train(**kwargs):
     kwargs["pre-transforms"] = {"GIFFLARTransform": "", "SweetNetTransform": ""}
     kwargs["hash"] = hash_dict(kwargs["pre-transforms"])
     seed_everything(kwargs["seed"])
@@ -61,6 +83,12 @@ def main(config):
     start = time.time()
     trainer.fit(model, datamodule)
     print("Training took", time.time() - start, "s")
+
+
+def main(config):
+    custom_args = read_yaml_config(config)
+    for args in unfold_config(custom_args):
+        train(**args)
 
 
 if __name__ == '__main__':
