@@ -5,26 +5,20 @@ from argparse import ArgumentParser
 import time
 import copy
 
-from numpy.f2py.cfuncs import callbacks
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import RichProgressBar, RichModelSummary
 from pytorch_lightning.loggers import CSVLogger
-from sympy.physics.units import acceleration
 from torch_geometric import seed_everything
 
 from experiments.lgi_model import LGI_Model
-from gifflar.data.modules import DownsteamGDM, LGI_GDM
-from gifflar.model.base import GlycanGIN
+from gifflar.data.modules import LGI_GDM
 from gifflar.model.baselines.sweetnet import SweetNetLightning
+from gifflar.model.downstream import DownstreamGGIN
 from gifflar.pretransforms import get_pretransforms
-from gifflar.train import setup
 from gifflar.utils import read_yaml_config, hash_dict
 
-import torch
-print(torch.cuda.is_available())
-
 GLYCAN_ENCODERS = {
-    "gifflar": GlycanGIN,
+    "gifflar": DownstreamGGIN,
     "sweetnet": SweetNetLightning,
 }
 
@@ -62,8 +56,10 @@ def train(**kwargs):
     )
 
     # set up the logger
-    glycan_model_name = kwargs["model"]["glycan_encoder"]["name"] + (kwargs["model"]["glycan_encoder"].get("suffix", None) or "")
-    lectin_model_name = kwargs["model"]["lectin_encoder"]["name"] + (kwargs["model"]["lectin_encoder"].get("suffix", None) or "")
+    glycan_model_name = kwargs["model"]["glycan_encoder"]["name"] + (
+            kwargs["model"]["glycan_encoder"].get("suffix", None) or "")
+    lectin_model_name = kwargs["model"]["lectin_encoder"]["name"] + (
+            kwargs["model"]["lectin_encoder"].get("suffix", None) or "")
     logger = CSVLogger(kwargs["logs_dir"], name="LGI_" + glycan_model_name + lectin_model_name)
     logger.log_hyperparams(kwargs)
 
@@ -74,7 +70,7 @@ def train(**kwargs):
         kwargs["model"]["lectin_encoder"]["layer_num"],
     )
     model.to("cuda")
-    
+
     trainer = Trainer(
         callbacks=[RichProgressBar(), RichModelSummary()],
         logger=logger,

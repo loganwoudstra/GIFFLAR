@@ -11,8 +11,15 @@ from gifflar.model.downstream import DownstreamGGIN
 
 
 class SweetNetLightning(DownstreamGGIN):
-    def __init__(self, feat_dim: int, hidden_dim: int, output_dim: int, num_layers: int,
-                 task: Literal["classification", "regression", "multilabel"], **kwargs: Any):
+    def __init__(
+            self,
+            feat_dim: int,
+            hidden_dim: int,
+            num_layers: int,
+            output_dim: int = -1,
+            task: Literal["classification", "regression", "multilabel"] | None = None,
+            **kwargs: Any
+    ):
         """
         Embed the SweetNet Model into the pytorch-lightning framework.
 
@@ -32,17 +39,18 @@ class SweetNetLightning(DownstreamGGIN):
         # Load the untrained model from glycowork
         self.item_embedding = nn.Embedding(len(lib), hidden_dim)
         self.layers = nn.Sequential(OrderedDict([(f"layer{l + 1}", GraphConv(hidden_dim, hidden_dim)) for l in range(num_layers)]))
-        
-        self.head = nn.Sequential(
-            nn.Linear(hidden_dim, 1024),
-            nn.BatchNorm1d(1024),
-            nn.LeakyReLU(),
-            nn.Linear(1024, 128),
-            nn.BatchNorm1d(128),
-            nn.LeakyReLU(),
-            nn.Dropout(0.5),
-            nn.Linear(128, output_dim),
-        )
+
+        if self.task is not None:
+            self.head = nn.Sequential(
+                nn.Linear(hidden_dim, 1024),
+                nn.BatchNorm1d(1024),
+                nn.LeakyReLU(),
+                nn.Linear(1024, 128),
+                nn.BatchNorm1d(128),
+                nn.LeakyReLU(),
+                nn.Dropout(0.5),
+                nn.Linear(128, output_dim),
+            )
     
     def forward(self, batch: HeteroDataBatch) -> dict[str, torch.Tensor]:
         """
@@ -67,7 +75,9 @@ class SweetNetLightning(DownstreamGGIN):
             x = layer(x, edge_index)
 
         graph_embed = global_mean_pool(x, batch_ids)
-        pred = self.head(graph_embed)
+        pred = None
+        if self.task is not None:
+            pred = self.head(graph_embed)
 
         return {
             "node_embed": x,

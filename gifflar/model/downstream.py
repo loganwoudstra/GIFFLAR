@@ -15,8 +15,8 @@ class DownstreamGGIN(GlycanGIN):
             self,
             feat_dim: int,
             hidden_dim: int,
-            output_dim: int,
-            task: Literal["regression", "classification", "multilabel"],
+            output_dim: int = -1,
+            task: Literal["regression", "classification", "multilabel"] | None = None,
             num_layers: int = 3,
             batch_size: int = 32,
             pre_transform_args: Optional[dict] = None,
@@ -35,13 +35,13 @@ class DownstreamGGIN(GlycanGIN):
             kwargs: Additional arguments
         """
         super().__init__(feat_dim, hidden_dim, num_layers, batch_size, pre_transform_args)
-        self.output_dim = output_dim
 
         self.pooling = GIFFLARPooling(kwargs.get("pooling", "global_mean"))
         # self.add_module('pooling', GIFFLARPooling(kwargs.get("pooling", "global_mean")))
+        self.output_dim = output_dim
         self.task = task
-
-        self.head, self.loss, self.metrics = get_prediction_head(hidden_dim, output_dim, task)
+        if self.task is not None:
+            self.head, self.loss, self.metrics = get_prediction_head(hidden_dim, self.output_dim, self.task)
 
     def to(self, device: torch.device) -> "DownstreamGGIN":
         """
@@ -75,7 +75,11 @@ class DownstreamGGIN(GlycanGIN):
         """
         node_embed = super().forward(batch)
         graph_embed = self.pooling(node_embed, batch.batch_dict)
-        pred = self.head(graph_embed)
+
+        pred = None
+        if self.task is not None:
+            pred = self.head(graph_embed)
+
         return {
             "node_embed": node_embed,
             "graph_embed": graph_embed,
