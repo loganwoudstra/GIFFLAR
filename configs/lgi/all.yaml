@@ -12,13 +12,13 @@ model:
       hidden_dim: 1024
       num_layers: 8
       pooling: global_mean
-    - name: sweetnet
-      feat_dim: 128
-      hidden_dim: 1024
-      num_layers: 16
+    #- name: sweetnet
+    #  feat_dim: 128
+    #  hidden_dim: 1024
+    #  num_layers: 16
   lectin_encoder:
-    - name: ESM
-      layer_num: 33
+    #- name: ESM
+    #  layer_num: 33
     - name: Ankh
       layer_num: 48
     - name: ProtBert

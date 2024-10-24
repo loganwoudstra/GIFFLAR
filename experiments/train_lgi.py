@@ -3,6 +3,7 @@ import os
 
 from argparse import ArgumentParser
 import time
+import copy
 
 from numpy.f2py.cfuncs import callbacks
 from pytorch_lightning import Trainer

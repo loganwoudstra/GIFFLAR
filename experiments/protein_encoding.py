@@ -7,6 +7,7 @@ from transformers import T5EncoderModel, AutoTokenizer, AutoModel, BertTokenizer
 class PLMEncoder:
     def __init__(self, layer_num: int):
         self.layer_num = layer_num
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
     def forward(self, seq: str) -> torch.Tensor:
         pass
@@ -19,7 +20,7 @@ class Ankh(PLMEncoder):
     def __init__(self, layer_num: int):
         super().__init__(layer_num)
         self.tokenizer = AutoTokenizer.from_pretrained("ElnaggarLab/ankh-base")
-        self.model = T5EncoderModel.from_pretrained("ElnaggarLab/ankh-base")
+        self.model = T5EncoderModel.from_pretrained("ElnaggarLab/ankh-base").to(self.device)
 
     def forward(self, seq: str) -> torch.Tensor:
         outputs = self.tokenizer.batch_encode_plus(
@@ -31,8 +32,8 @@ class Ankh(PLMEncoder):
         )
         with torch.no_grad():
             ankh = self.model(
-                input_ids=outputs["input_ids"],
-                attention_mask=outputs["attention_mask"],
+                input_ids=outputs["input_ids"].to(self.device),
+                attention_mask=outputs["attention_mask"].to(self.device),
                 output_attentions=False,
                 output_hidden_states=True,
             )
@@ -42,7 +43,6 @@ class Ankh(PLMEncoder):
 class ESM(PLMEncoder):
     def __init__(self, layer_num: int):
         super().__init__(layer_num)
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.tokenizer = AutoTokenizer.from_pretrained("facebook/esm2_t33_650M_UR50D")
         self.model = AutoModel.from_pretrained("facebook/esm2_t33_650M_UR50D").to(self.device)
 
@@ -55,7 +55,6 @@ class ESM(PLMEncoder):
                 output_attentions=False,
                 output_hidden_states=True,
             )
-        print(seq)
         return esm.hidden_states[self.layer_num][:, 1:-1].mean(dim=1)[0]
 
 
@@ -63,7 +62,7 @@ class ProtBERT(PLMEncoder):
     def __init__(self, layer_num: int):
         super().__init__(layer_num)
         self.tokenizer = BertTokenizer.from_pretrained("Rostlab/prot_bert", do_lower_case=False)
-        self.model = AutoModel.from_pretrained("Rostlab/prot_bert")
+        self.model = AutoModel.from_pretrained("Rostlab/prot_bert").to(self.device)
 
     def forward(self, seq: str) -> torch.Tensor:
         sequence_w_spaces = ' '.join(seq)
@@ -84,7 +83,7 @@ class ProstT5(PLMEncoder):
     def __init__(self, layer_num: int):
         super().__init__(layer_num)
         self.tokenizer = T5Tokenizer.from_pretrained("Rostlab/ProstT5")
-        self.model = T5EncoderModel.from_pretrained("Rostlab/ProstT5")
+        self.model = T5EncoderModel.from_pretrained("Rostlab/ProstT5").to(self.device)
 
     def forward(self, seq: str) -> torch.Tensor:
         seq = [" ".join(list(re.sub(r"[UZOB]", "X", sequence))) for sequence in [seq]]
@@ -97,8 +96,8 @@ class ProstT5(PLMEncoder):
         )
         with torch.no_grad():
             prostt5 = self.model(
-                ids.input_ids,
-                attention_mask=ids.attention_mask,
+                ids.input_ids.to(self.device),
+                attention_mask=ids.attention_mask.to(self.device),
                 output_attentions=False,
                 output_hidden_states=True,
             )
@@ -109,10 +108,10 @@ class AMPLIFY(PLMEncoder):
     def __init__(self, layer_num: int):
         super().__init__(layer_num)
         self.tokenizer = AutoTokenizer.from_pretrained("chandar-lab/AMPLIFY_350M", trust_remote_code=True)
-        self.model = AutoModel.from_pretrained("chandar-lab/AMPLIFY_350M", trust_remote_code=True).to("cuda")
+        self.model = AutoModel.from_pretrained("chandar-lab/AMPLIFY_350M", trust_remote_code=True).to(self.device)
 
     def forward(self, seq: str) -> torch.Tensor:
-        a = self.tokenizer.encode(seq, return_tensors="pt").to("cuda")
+        a = self.tokenizer.encode(seq, return_tensors="pt").to(self.device)
         with torch.no_grad():
             amplify = self.model(
                 a,
