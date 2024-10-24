@@ -5,13 +5,13 @@ from typing import Union, Optional, Callable, Any
 import numpy as np
 import pandas as pd
 import torch
-from torch_geometric.data import InMemoryDataset, HeteroData
+from torch_geometric.data import InMemoryDataset, HeteroData, OnDiskDataset
 from tqdm import tqdm
 
 from gifflar.data.utils import GlycanStorage
 
 
-class GlycanDataset(InMemoryDataset):
+class GlycanDataset(OnDiskDataset):
     def __init__(
             self,
             root: str | Path,
@@ -36,8 +36,8 @@ class GlycanDataset(InMemoryDataset):
         """
         self.filename = Path(filename)
         self.dataset_args = dataset_args
-        super().__init__(root=str(Path(root) / f"{self.filename.stem}_{hash_code}"), transform=transform,
-                         pre_transform=pre_transform)
+        self.pre_transform = pre_transform
+        super().__init__(root=str(Path(root) / f"{self.filename.stem}_{hash_code}"), transform=transform)
         self.data, self.dataset_args = torch.load(self.processed_paths[path_idx])
 
     def __len__(self) -> int:
@@ -68,7 +68,6 @@ class GlycanDataset(InMemoryDataset):
         if self.pre_filter is not None:
             data = [d for d in data if self.pre_filter(d)]
         if self.pre_transform is not None:
-            # data = [self.pre_transform(d) for d in data]
             data = self.pre_transform(data)
 
         torch.save((data, self.dataset_args), self.processed_paths[path_idx])
