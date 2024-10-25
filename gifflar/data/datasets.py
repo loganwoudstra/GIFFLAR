@@ -1,17 +1,104 @@
 import pickle
 from pathlib import Path
 from typing import Union, Optional, Callable, Any
+import os
 
 import numpy as np
 import pandas as pd
 import torch
-from torch_geometric.data import InMemoryDataset, HeteroData, OnDiskDataset
+from torch_geometric.data import InMemoryDataset, HeteroData, OnDiskDataset, Database, SQLiteDatabase
+from torch_geometric.data.data import BaseData
+from torch_geometric.data.database import Schema
+from torch_geometric.data.dataset import Dataset
 from tqdm import tqdm
 
 from gifflar.data.utils import GlycanStorage
 
 
-class GlycanDataset(OnDiskDataset):
+class GlycanOnDiskDataset(OnDiskDataset):
+    def __init__(
+            self,
+            root: str,
+            transform: Optional[Callable] = None,
+            pre_transform: Optional[Callable] = None,
+            pre_filter: Optional[Callable] = None,
+            schema: Schema = object,
+            path_idx: int = 0,
+            log: bool = True,
+    ) -> None:
+        self.backend = "sqlite"  # "sqlite" or "rocksdb"
+        self.schema = schema
+        self.path_idx = path_idx
+
+        self._db: Optional[Database] = None
+        self._numel: Optional[int] = None
+        super(OnDiskDataset, self).__init__(root, transform, pre_transform, pre_filter, log=log)
+
+    def get_db(self, path_idx):
+        kwargs = {}
+        cls = self.BACKENDS[self.backend]
+        if issubclass(cls, SQLiteDatabase):
+            kwargs['name'] = self.__class__.__name__
+
+        os.makedirs(self.processed_dir, exist_ok=True)
+        path = self.processed_paths[path_idx]
+        db = cls(path=path, schema=self.schema, **kwargs)
+        return db
+
+    @property
+    def db(self) -> Database:
+        r"""Returns the underlying :class:`Database`."""
+        if self._db is None:
+            self._db = self.get_db(self.path_idx)
+            self._numel = len(self._db)
+        return self._db
+
+    def get(self, idx: int) -> BaseData:
+        d = super().get(idx)
+        if self.transform is not None:
+            d = self.transform(d)
+        return d
+
+    def __getitem__(self, idx: int):
+        return self.get(idx)
+
+    def process_(self, data: list[HeteroData], path_idx: int):
+        """
+
+        """
+        db = self.get_db(path_idx)
+        db.multi_insert(range(len(data)), data, batch_size=None)
+        db.close()
+
+
+class GlycanInMemoryDataset(InMemoryDataset):
+    def __init__(
+            self,
+            root: str | Path,
+            transform: Optional[Callable] = None,
+            pre_transform: Optional[Callable] = None,
+            path_idx: int = 0,
+    ) -> None:
+        super().__init__(root, transform, pre_transform)
+        self.data, self.dataset_args = torch.load(self.processed_paths[path_idx])
+    
+    def __len__(self) -> int:
+        """Return the length of the dataset."""
+        return self.data.__len__()
+    
+    def len(self) -> int:
+        """Return the length of the dataset."""
+        return len(self)
+    
+    def __getitem__(self, item) -> Any:
+        """Return the item at the given index."""
+        return self.data[item] if self.transform is None else self.transform(self.data[item])
+
+    def process_(self, data: list[HeteroData], path_idx: Path | str):
+        torch.save((data, self.dataset_args), self.processed_paths[path_idx])
+
+
+class GlycanDataset(GlycanOnDeskDataset):
     def __init__(
             self,
             root: str | Path,
@@ -36,21 +123,7 @@ class GlycanDataset(OnDiskDataset):
         """
         self.filename = Path(filename)
         self.dataset_args = dataset_args
-        self.pre_transform = pre_transform
-        super().__init__(root=str(Path(root) / f"{self.filename.stem}_{hash_code}"), transform=transform)
-        self.data, self.dataset_args = torch.load(self.processed_paths[path_idx])
-
-    def __len__(self) -> int:
-        """Return the length of the dataset."""
-        return self.data.__len__()
-
-    def len(self) -> int:
-        """Return the length of the dataset."""
-        return len(self)
-
-    def __getitem__(self, item) -> Any:
-        """Return the item at the given index."""
-        return self.data[item] if self.transform is None else self.transform(self.data[item])
+        super().__init__(root=str(Path(root) / f"{self.filename.stem}_{hash_code}"), transform=transform, pre_transform=pre_transform, path_idx=path_idx)
 
     @property
     def processed_paths(self) -> list[str]:
@@ -68,9 +141,10 @@ class GlycanDataset(OnDiskDataset):
         if self.pre_filter is not None:
             data = [d for d in data if self.pre_filter(d)]
         if self.pre_transform is not None:
+            print("Pre-Transform")
             data = self.pre_transform(data)
 
-        torch.save((data, self.dataset_args), self.processed_paths[path_idx])
+        super().process_(data, path_idx)
 
 
 class PretrainGDs(GlycanDataset):
@@ -212,6 +286,7 @@ class LGIDataset(DownstreamGDs):
     def process(self) -> None:
         """Process the data and store it."""
         print("Start processing")
+        print(self.pre_transform)
         data = {k: [] for k in self.splits}
         with open(self.filename, "rb") as f:
             inter, lectin_map, glycan_map = pickle.load(f)
@@ -230,4 +305,5 @@ class LGIDataset(DownstreamGDs):
         gs.close()
         print("Processed", sum(len(v) for v in data.values()), "entries")
         for split in self.splits:
+            print("Post-process", split)
             self.process_(data[split], path_idx=self.splits[split])

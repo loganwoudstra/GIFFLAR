@@ -7,6 +7,7 @@ from torch_geometric.data import HeteroData
 
 from experiments.protein_encoding import ENCODER_MAP, EMBED_SIZES
 from gifflar.data.utils import GlycanStorage
+from gifflar.data.hetero import HeteroDataBatch
 from gifflar.model.base import GlycanGIN
 from gifflar.model.baselines.sweetnet import SweetNetLightning
 from gifflar.model.utils import GIFFLARPooling, get_prediction_head
@@ -66,7 +67,7 @@ class LGI_Model(LightningModule):
         self.lectin_embeddings = LectinStorage(lectin_encoder, le_layer_num)
         self.combined_dim = glycan_encoder.hidden_dim + EMBED_SIZES[lectin_encoder]
 
-        self.head, self.loss, self.metrics = get_prediction_head(self.combined_dim, 1, "regression")
+        self.head, self.loss, self.metrics = get_prediction_head(self.combined_dim, 1, "regression", size="large")
 
     def to(self, device: torch.device):
         super(LGI_Model, self).to(device)
@@ -76,16 +77,15 @@ class LGI_Model(LightningModule):
         for split, metric in self.metrics.items():
             self.metrics[split] = metric.to(device)
 
-    def forward(self, data: HeteroData) -> dict[str, torch.Tensor]:
-        glycan_node_embed = self.glycan_encoder(data)
-        glycan_graph_embed = self.glycan_pooling(glycan_node_embed, data.batch_dict)
+    def forward(self, data: HeteroDataBatch) -> dict[str, torch.Tensor]:
+        glycan_embed = self.glycan_encoder(data)
         lectin_embed = self.lectin_embeddings.batch_query(data["aa_seq"])
-        combined = torch.cat([glycan_graph_embed, lectin_embed], dim=-1)
+        combined = torch.cat([glycan_embed["graph_embed"], lectin_embed], dim=-1)
         pred = self.head(combined)
 
         return {
-            "glycan_node_embeds": glycan_node_embed,
-            "glycan_graph_embeds": glycan_graph_embed,
+            "glycan_node_embeds": glycan_embed["node_embed"],
+            "glycan_graph_embeds": glycan_embed["graph_embed"],
             "lectin_embeds": lectin_embed,
             "preds": pred,
         }

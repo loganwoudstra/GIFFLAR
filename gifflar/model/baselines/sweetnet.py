@@ -34,13 +34,13 @@ class SweetNetLightning(DownstreamGGIN):
         super().__init__(feat_dim, hidden_dim, output_dim, task, **kwargs)
 
         del self.convs
-        del self.head
 
         # Load the untrained model from glycowork
         self.item_embedding = nn.Embedding(len(lib), hidden_dim)
         self.layers = nn.Sequential(OrderedDict([(f"layer{l + 1}", GraphConv(hidden_dim, hidden_dim)) for l in range(num_layers)]))
 
         if self.task is not None:
+            del self.head
             self.head = nn.Sequential(
                 nn.Linear(hidden_dim, 1024),
                 nn.BatchNorm1d(1024),

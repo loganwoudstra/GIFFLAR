@@ -1,5 +1,5 @@
 torch
-torch_geometric
+torch_geometric>=2.6.1
 rdkit>=2022
 scikit-learn
 numpy

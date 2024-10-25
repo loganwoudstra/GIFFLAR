@@ -56,8 +56,9 @@ class DownstreamGGIN(GlycanGIN):
         super(DownstreamGGIN, self).to(device)
         if isinstance(self.pooling, GIFFLARPooling):
             self.pooling.to(device)
-        for split, metric in self.metrics.items():
-            self.metrics[split] = metric.to(device)
+        if self.task is not None:
+            for split, metric in self.metrics.items():
+                self.metrics[split] = metric.to(device)
         return self
 
     def forward(self, batch: HeteroDataBatch) -> dict[str, torch.Tensor]:

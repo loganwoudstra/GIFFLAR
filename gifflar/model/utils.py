@@ -105,7 +105,8 @@ def get_prediction_head(
         input_dim: int,
         num_predictions: int,
         task: Literal["regression", "classification", "multilabel"],
-        metric_prefix: str = ""
+        metric_prefix: str = "",
+        size: Literal["small", "medium", "large"] = "small",
 ) -> tuple[nn.Module, nn.Module, dict[str, nn.Module]]:
     """
     Create the prediction head for the specified dimensions and generate the loss and metrics for the task
@@ -120,12 +121,36 @@ def get_prediction_head(
         A tuple containing the prediction head, the loss function and the metrics for the task
     """
     # Create the prediction head
-    head = nn.Sequential(
-        nn.Linear(input_dim, input_dim // 2),
-        nn.PReLU(),
-        nn.Dropout(0.2),
-        nn.Linear(input_dim // 2, num_predictions)
-    )
+    if size == "small":
+        head = nn.Sequential(
+            nn.Linear(input_dim, input_dim // 2),
+            nn.PReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(input_dim // 2, num_predictions)
+        )
+    elif size == "medium":
+        head = nn.Sequential(
+            nn.Linear(input_dim, input_dim // 2),
+            nn.PReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(input_dim // 2, input_dim // 4),
+            nn.PReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(input_dim // 4, num_predictions)
+        )
+    elif size == "large":
+        head = nn.Sequential(
+            nn.Linear(input_dim, input_dim // 2),
+            nn.PReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(input_dim // 2, input_dim // 2),
+            nn.PReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(input_dim // 2, input_dim // 4),
+            nn.PReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(input_dim // 4, num_predictions)
+        )
     # Add a softmax layer if the task is classification and there are multiple predictions
     if task == "classification" and num_predictions > 1:
         head.append(nn.Softmax(dim=-1))

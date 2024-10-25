@@ -499,6 +499,7 @@ class TQDMCompose(Compose):
         Returns:
             The transformed data
         """
+        print("TQDM Pretransformation")
         for transform in tqdm(self.transforms, desc=f"Transform"):
             if not isinstance(data, (list, tuple)):
                 data = transform(data)
