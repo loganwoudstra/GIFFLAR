@@ -26,7 +26,6 @@ class Ankh(PLMEncoder):
         outputs = self.tokenizer.batch_encode_plus(
             [list(seq)],
             add_special_tokens=True,
-            padding=True,
             is_split_into_words=True,
             return_tensors="pt",
         )
@@ -37,7 +36,7 @@ class Ankh(PLMEncoder):
                 output_attentions=False,
                 output_hidden_states=True,
             )
-        return ankh.hidden_states[self.layer_num][:, :-1].mean(dim=1)[0]
+        return ankh.hidden_states[self.layer_num][:, 1:].mean(dim=1)[0]
 
 
 class ESM(PLMEncoder):
@@ -68,15 +67,17 @@ class ProtBERT(PLMEncoder):
         sequence_w_spaces = ' '.join(seq)
         encoded_input = self.tokenizer(
             sequence_w_spaces,
-            return_tensors='pt'
+            return_tensors='pt',
         )
         with torch.no_grad():
             protbert = self.model(
-                **encoded_input,
+                input_ids=encoded_input["input_ids"].to(self.device),
+                attention_mask=encoded_input["attention_mask"].to(self.device),
+                token_type_ids=encoded_input["token_type_ids"].to(self.device),
                 output_attentions=False,
                 output_hidden_states=True,
             )
-        return protbert.hidden_states[self.layer_num][:, 1:-1].mean(dim=2)[0]
+        return protbert.hidden_states[self.layer_num][:, 1:-1].mean(dim=1)[0]
 
 
 class ProstT5(PLMEncoder):
@@ -87,12 +88,11 @@ class ProstT5(PLMEncoder):
 
     def forward(self, seq: str) -> torch.Tensor:
         seq = [" ".join(list(re.sub(r"[UZOB]", "X", sequence))) for sequence in [seq]]
-        seq = ["<AA2fold>" + " " + s if s.isupper() else "<fold2AA>" + " " + s for s in seq]
+        seq = ["<AA2fold>" + " " + s.upper() for s in seq]
         ids = self.tokenizer.batch_encode_plus(
             seq,
             add_special_tokens=True,
-            padding="longest",
-            return_tensors='pt'
+            return_tensors='pt',
         )
         with torch.no_grad():
             prostt5 = self.model(
@@ -101,7 +101,7 @@ class ProstT5(PLMEncoder):
                 output_attentions=False,
                 output_hidden_states=True,
             )
-        return prostt5.hidden_states[self.layer_num][:, 1:-1].mean(dim=2)[0]
+        return prostt5.hidden_states[self.layer_num][:, 1:-1].mean(dim=1)[0]
 
 
 class AMPLIFY(PLMEncoder):

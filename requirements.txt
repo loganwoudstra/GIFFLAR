@@ -16,3 +16,4 @@ torchmetrics
 transformers
 sentencepiece
 xformers==0.0.28.post1
+protobuf

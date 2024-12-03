@@ -3,7 +3,7 @@ from collections import OrderedDict
 
 import torch
 from torch import nn
-from torch_geometric.nn import global_mean_pool, GraphConv
+from torch_geometric.nn import global_mean_pool, GraphConv, BatchNorm
 from glycowork.glycan_data.loader import lib
 
 from gifflar.data.hetero import HeteroDataBatch
@@ -37,7 +37,11 @@ class SweetNetLightning(DownstreamGGIN):
 
         # Load the untrained model from glycowork
         self.item_embedding = nn.Embedding(len(lib), hidden_dim)
-        self.layers = nn.Sequential(OrderedDict([(f"layer{l + 1}", GraphConv(hidden_dim, hidden_dim)) for l in range(num_layers)]))
+        layers = []
+        for l in range(num_layers):
+            layers.append((f"layer_{l + 1}_gc", GraphConv(hidden_dim, hidden_dim)))
+            layers.append((f"layer_{l + 1}_bn", BatchNorm(hidden_dim)))
+        self.layers = nn.Sequential(OrderedDict(layers))
 
         if self.task is not None:
             del self.head
@@ -71,8 +75,8 @@ class SweetNetLightning(DownstreamGGIN):
         x = self.item_embedding(x)
         x = x.squeeze(1)
 
-        for layer in self.layers:
-            x = layer(x, edge_index)
+        for l in range(0, len(self.layers), 2):
+            x = self.layers[l + 1](self.layers[l](x, edge_index))
 
         graph_embed = global_mean_pool(x, batch_ids)
         pred = None

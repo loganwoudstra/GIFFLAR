@@ -98,7 +98,7 @@ class GlycanInMemoryDataset(InMemoryDataset):
         torch.save((data, self.dataset_args), self.processed_paths[path_idx])
 
 
-class GlycanDataset(GlycanOnDeskDataset):
+class GlycanDataset(GlycanOnDiskDataset):
     def __init__(
             self,
             root: str | Path,

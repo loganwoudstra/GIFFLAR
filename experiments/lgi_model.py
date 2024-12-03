@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, Literal
+import copy
 
 import torch
 from pytorch_lightning import LightningModule
@@ -31,7 +32,8 @@ class LectinStorage(GlycanStorage):
         if aa_seq not in self.data:
             try:
                 self.data[aa_seq] = self.encoder(aa_seq)
-            except:
+            except Exception as e:
+                print(e)
                 self.data[aa_seq] = None
 
         return self.data[aa_seq]
@@ -59,6 +61,7 @@ class LGI_Model(LightningModule):
             kwargs: Additional arguments
         """
         super().__init__()
+
         self.glycan_encoder = glycan_encoder
         self.glycan_pooling = GIFFLARPooling("global_mean")
         self.lectin_encoder = lectin_encoder
@@ -140,6 +143,7 @@ class LGI_Model(LightningModule):
     def on_validation_epoch_end(self) -> None:
         """Compute the end of the validation"""
         self.shared_end("val")
+        self.lectin_embeddings.close()
 
     def on_test_epoch_end(self) -> None:
         """Compute the end of the testing"""
