@@ -1,12 +1,12 @@
 import os
-# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 from argparse import ArgumentParser
 import time
 import copy
-
+from pathlib import Path
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import RichProgressBar, RichModelSummary
+from pytorch_lightning.callbacks import RichProgressBar, RichModelSummary, ModelCheckpoint
 from pytorch_lightning.loggers import CSVLogger
 from torch_geometric import seed_everything
 
@@ -68,11 +68,16 @@ def train(**kwargs):
         glycan_encoder,
         kwargs["model"]["lectin_encoder"]["name"],
         kwargs["model"]["lectin_encoder"]["layer_num"],
+        **kwargs,
     )
     model.to("cuda")
 
     trainer = Trainer(
-        callbacks=[RichProgressBar(), RichModelSummary()],
+        callbacks=[
+            ModelCheckpoint(dirpath=Path(kwargs["logs_dir"]) / "full", monitor="val/loss"),
+            RichProgressBar(), 
+            RichModelSummary(),
+        ],
         logger=logger,
         max_epochs=kwargs["model"]["epochs"],
         accelerator="gpu",

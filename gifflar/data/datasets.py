@@ -2,6 +2,7 @@ import pickle
 from pathlib import Path
 from typing import Union, Optional, Callable, Any
 import os
+import shutil
 
 import numpy as np
 import pandas as pd
@@ -25,6 +26,7 @@ class GlycanOnDiskDataset(OnDiskDataset):
             schema: Schema = object,
             path_idx: int = 0,
             log: bool = True,
+            force_reload: bool = False,
     ) -> None:
         self.backend = "sqlite"  # "sqlite" or "rocksdb"
         self.schema = schema
@@ -32,7 +34,14 @@ class GlycanOnDiskDataset(OnDiskDataset):
 
         self._db: Optional[Database] = None
         self._numel: Optional[int] = None
-        super(OnDiskDataset, self).__init__(root, transform, pre_transform, pre_filter, log=log)
+        super(OnDiskDataset, self).__init__(root, transform, pre_transform, pre_filter, log=log, force_reload=force_reload)
+
+    def _process(self):
+        if self.force_reload:
+            print("Remove root", self.root)
+            shutil.rmtree(self.root, ignore_errors=True)
+            self.force_reload = False
+        super(OnDiskDataset, self)._process()
 
     def get_db(self, path_idx):
         kwargs = {}
@@ -66,8 +75,10 @@ class GlycanOnDiskDataset(OnDiskDataset):
         """
 
         """
+        
         db = self.get_db(path_idx)
-        db.multi_insert(range(len(data)), data, batch_size=None)
+        if len(data) != 0:
+            db.multi_insert(range(len(data)), data, batch_size=None)
         db.close()
 
 
@@ -78,8 +89,9 @@ class GlycanInMemoryDataset(InMemoryDataset):
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
             path_idx: int = 0,
+            force_reload: bool = False,
     ) -> None:
-        super().__init__(root, transform, pre_transform)
+        super().__init__(root, transform, pre_transform, force_reload=force_reload)
         self.data, self.dataset_args = torch.load(self.processed_paths[path_idx])
     
     def __len__(self) -> int:
@@ -107,6 +119,7 @@ class GlycanDataset(GlycanOnDiskDataset):
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
             path_idx: int = 0,
+            force_reload: bool = False,
             **dataset_args: dict[str, Any],
     ):
         """
@@ -123,7 +136,7 @@ class GlycanDataset(GlycanOnDiskDataset):
         """
         self.filename = Path(filename)
         self.dataset_args = dataset_args
-        super().__init__(root=str(Path(root) / f"{self.filename.stem}_{hash_code}"), transform=transform, pre_transform=pre_transform, path_idx=path_idx)
+        super().__init__(root=str(Path(root) / f"{self.filename.stem}_{hash_code}"), transform=transform, pre_transform=pre_transform, path_idx=path_idx, force_reload=force_reload)
 
     @property
     def processed_paths(self) -> list[str]:
@@ -155,6 +168,7 @@ class PretrainGDs(GlycanDataset):
             hash_code: str,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
+            force_reload: bool = False,
             **dataset_args: dict[str, Any],
     ):
         """
@@ -169,7 +183,7 @@ class PretrainGDs(GlycanDataset):
             **dataset_args: Additional arguments to pass to the dataset
         """
         super().__init__(root=root, filename=filename, hash_code=hash_code, transform=transform,
-                         pre_transform=pre_transform, **dataset_args)
+                         pre_transform=pre_transform, dataset_args=dataset_args, **kwargs)
 
     @property
     def processed_file_names(self) -> Union[str, list[str], tuple[str, ...]]:
@@ -203,6 +217,7 @@ class DownstreamGDs(GlycanDataset):
             hash_code: str,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
+            force_reload: bool = False,
             **dataset_args: dict[str, Any],
     ):
         """
@@ -218,7 +233,7 @@ class DownstreamGDs(GlycanDataset):
             **dataset_args: Additional arguments to pass to the dataset
         """
         super().__init__(root=root, filename=filename, hash_code=hash_code, transform=transform,
-                         pre_transform=pre_transform, path_idx=self.splits[split], **dataset_args)
+                         pre_transform=pre_transform, path_idx=self.splits[split], force_reload=force_reload, **dataset_args)
 
     @property
     def processed_file_names(self) -> Union[str, list[str], tuple[str, ...]]:
@@ -285,8 +300,14 @@ class DownstreamGDs(GlycanDataset):
 class LGIDataset(DownstreamGDs):
     def process(self) -> None:
         """Process the data and store it."""
-        print("Start processing")
-        print(self.pre_transform)
+        # print("Processing", self.filename)
+        # traceback.print_stack()
+        if str(self.filename).endswith(".pkl"):
+            self.process_pkl()
+        elif str(self.filename)[-4:] in {".csv", ".tsv"}:
+            self.process_csv(sep="," if str(self.filename)[-3] == "c" else "\t")
+
+    def process_pkl(self) -> None:
         data = {k: [] for k in self.splits}
         with open(self.filename, "rb") as f:
             inter, lectin_map, glycan_map = pickle.load(f)
@@ -302,6 +323,25 @@ class LGIDataset(DownstreamGDs):
             d["ID"] = i
             data[split].append(d)
 
+        gs.close()
+        print("Processed", sum(len(v) for v in data.values()), "entries")
+        for split in self.splits:
+            print("Post-process", split)
+            self.process_(data[split], path_idx=self.splits[split])
+
+    def process_csv(self, sep: str) -> None:
+        data = {k: [] for k in self.splits}
+        inter = pd.read_csv(self.filename, sep=sep)
+        gs = GlycanStorage(Path(self.root).parent)
+        for i, (_, row) in tqdm(enumerate(inter.iterrows())):
+            d = gs.query(row["IUPAC"])
+            if d is None:
+                continue
+            d["aa_seq"] = row["seq"]
+            d["y"] = torch.tensor([getattr(row, "y", 0)])
+            d["ID"] = i
+            data[getattr(row, "split", "train")].append(d)
+        
         gs.close()
         print("Processed", sum(len(v) for v in data.values()), "entries")
         for split in self.splits:

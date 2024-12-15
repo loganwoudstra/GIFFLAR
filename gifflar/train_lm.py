@@ -6,10 +6,10 @@ from gifflar.tokenize.pretokenize import GrammarPreTokenizer
 from gifflar.tokenize.tokenizer import GIFFLARTokenizer
 
 bpe = GIFFLARTokenizer(GrammarPreTokenizer())
-bpe.load("bpe_1k.pkl")
+bpe.load("datasets/bpe_glyles_50.pkl")
 
 wp = GIFFLARTokenizer(GrammarPreTokenizer())
-wp.load("wp_1k.pkl")
+wp.load("datasets/wp_glycowork_50.pkl")
 
 t = wp
 MAX_LENGTH = 200
@@ -17,7 +17,7 @@ MAX_LENGTH = 200
 def tokenize_function(entries: dict) -> Encoding:
     return t(entries["text"], padding="max_length", truncation=True, max_length=MAX_LENGTH)
 
-dataset = load_dataset("text", data_files={"train": "iupacs.txt"})
+dataset = load_dataset("text", data_files={"train": "datasets/glycans_1000.txt"})
 proc_ds = dataset.map(tokenize_function, batched=False, remove_columns=["text"])
 
 esm_config = EsmConfig(

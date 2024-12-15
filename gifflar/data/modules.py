@@ -12,7 +12,7 @@ from gifflar.data.hetero import hetero_collate
 class GlycanDataModule(LightningDataModule):
     """DataModule holding datasets for Glycan-specific training"""
 
-    def __init__(self, batch_size: int = 128, num_workers: int = 16, **kwargs: Any):
+    def __init__(self, batch_size: int = 128, num_workers: int = 1, **kwargs: Any):
         """
         Initialize the DataModule with a given batch size.
 
@@ -113,6 +113,7 @@ class DownsteamGDM(GlycanDataModule):
             batch_size: int = 64,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
+            force_reload: bool = False,
             **dataset_args: dict[str, Any],
     ):
         """
@@ -130,7 +131,7 @@ class DownsteamGDM(GlycanDataModule):
         super().__init__(batch_size)
         self.train = self.ds_class(
             root=root, filename=filename, split="train", hash_code=hash_code, transform=transform,
-            pre_transform=pre_transform, **dataset_args,
+            pre_transform=pre_transform, force_reload=force_reload, **dataset_args,
         )
         self.val = self.ds_class(
             root=root, filename=filename, split="val", hash_code=hash_code, transform=transform,

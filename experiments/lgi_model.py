@@ -24,7 +24,9 @@ class LectinStorage(GlycanStorage):
                 otherwise, such file will be created.
         """
         self.path = Path(path or "data") / f"{lectin_encoder}_{le_layer_num}.pkl"
-        print("Path:", self.path.resolve())
+        # print("Path:", self.path.resolve())
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        
         self.encoder = ENCODER_MAP[lectin_encoder](le_layer_num)
         self.data = self._load()
 
@@ -33,7 +35,7 @@ class LectinStorage(GlycanStorage):
             try:
                 self.data[aa_seq] = self.encoder(aa_seq)
             except Exception as e:
-                print(e)
+                # print(e)
                 self.data[aa_seq] = None
 
         return self.data[aa_seq]
@@ -67,7 +69,7 @@ class LGI_Model(LightningModule):
         self.lectin_encoder = lectin_encoder
         self.le_layer_num = le_layer_num
 
-        self.lectin_embeddings = LectinStorage(lectin_encoder, le_layer_num)
+        self.lectin_embeddings = LectinStorage(lectin_encoder, le_layer_num, kwargs["root_dir"])
         self.combined_dim = glycan_encoder.hidden_dim + EMBED_SIZES[lectin_encoder]
 
         self.head, self.loss, self.metrics = get_prediction_head(self.combined_dim, 1, "regression", size="large")
@@ -124,6 +126,12 @@ class LGI_Model(LightningModule):
     def test_step(self, batch: HeteroData, batch_idx: int) -> dict[str, torch.Tensor]:
         """Compute the testing step of the model"""
         return self.shared_step(batch, "test")
+
+    def predict_step(self, batch: HeteroData, batch_idx: int) -> dict[str, torch.Tensor]:
+        fwd_dict = self(batch)
+        fwd_dict["IUPAC"] = batch["IUPAC"]
+        fwd_dict["seq"] = batch["aa_seq"]
+        return fwd_dict
 
     def shared_end(self, stage: Literal["train", "val", "test"]):
         """

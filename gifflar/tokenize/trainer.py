@@ -43,8 +43,7 @@ class TokenizerTrainer:
 
 
 class BPETrainer(TokenizerTrainer):
-    def __init__(self, pre_tokenizer, token_path="gifflar/grammar/tokens.txt", corpus_path="iupacs.txt",
-                 num_token: int = 50):
+    def __init__(self, pre_tokenizer, token_path="gifflar/grammar/tokens.txt", corpus_path="iupacs.txt", num_token: int = 50):
         super(BPETrainer, self).__init__(pre_tokenizer, corpus_path)
 
         with open(token_path, "r") as f:

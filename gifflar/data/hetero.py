@@ -84,8 +84,7 @@ def hetero_collate(data: Optional[Union[list[list[HeteroData]], list[HeteroData]
     # Include data for the baselines and other kwargs for house-keeping
     baselines = {"gnngly", "sweetnet", "rgcn"}
     kwargs = {key: [] for key in dict(data[0]) if all(b not in key for b in baselines)}
-    # print([d["y"] for d in data])
-
+    #print("\n[", [d["y"] for d in data], "]")
     # Store the node counts to offset edge indices when collating
     node_counts = {node_type: [0] for node_type in node_types}
     for d in data:
@@ -94,7 +93,9 @@ def hetero_collate(data: Optional[Union[list[list[HeteroData]], list[HeteroData]
             try:
                 if not hasattr(d[key], "__len__") or len(d[key]) != 0:
                     kwargs[key].append(d[key])
-            except:
+                #print(key, "failing")
+            except Exception as e:
+                #print(e)
                 pass
 
         # Compute the offsets for each node type for sample identification after batching
@@ -164,12 +165,14 @@ def hetero_collate(data: Optional[Union[list[list[HeteroData]], list[HeteroData]
         if any(key.startswith(b) for b in baselines):
             continue
         elif len(value) != len(data):
+            #print("\n-------------------------------\n", key, "|", len(value), "|", len(data), "\n-------------------------------\n")
             del kwargs[key]
         elif isinstance(value[0], torch.Tensor):
             dim = determine_concat_dim(value)
             if dim is None:
                 raise ValueError(f"Tensors for key {key} cannot be concatenated.")
             kwargs[key] = torch.cat(value, dim=dim)
+    #print(kwargs)
 
     # Finally create and return the HeteroDataBatch
     return HeteroDataBatch(x_dict=x_dict, edge_index_dict=edge_index_dict, edge_attr_dict=edge_attr_dict,

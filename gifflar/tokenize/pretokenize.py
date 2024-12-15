@@ -1,6 +1,7 @@
 import networkx as nx
 from antlr4.CommonTokenStream import CommonTokenStream
 from antlr4.InputStream import InputStream
+from glycowork.motif.graph import glycan_to_nxGraph
 
 from glyles.grammar.GlycanLexer import GlycanLexer
 from glyles.grammar.GlycanParser import GlycanParser
@@ -102,7 +103,7 @@ def graph_to_token_stream(graph):
                 tokens += graph_to_token_stream_int(p)
             else:
                 tokens += ["{"] + graph_to_token_stream_int(p) + ["}"]
-        return tokens,
+        return tokens
     else:
         return graph_to_token_stream_int(graph)
 
@@ -120,12 +121,12 @@ class PreTokenizer:
 
 class GlycoworkPreTokenizer(PreTokenizer):
     def __call__(self, iupac: str):
-        return graph_to_token_stream(iupac)
+        return graph_to_token_stream(glycan_to_nxGraph(iupac))
 
 
 class GrammarPreTokenizer(PreTokenizer):
     def __call__(self, iupac: str):
         iupac = iupac.strip().replace(" ", "")
-        token = CommonTokenStream(GlycanLexer(InputStream(data="{" + iupac + "}")))
+        token = CommonTokenStream(GlycanLexer(InputStream(data="#" + iupac + "#")))
         GlycanParser(token).start()
         return [t.text for t in token.tokens[1:-2]]
