@@ -17,6 +17,7 @@ class PLMEncoder:
 
 
 class Ankh(PLMEncoder):
+    # 450M parameters
     def __init__(self, layer_num: int):
         super().__init__(layer_num)
         self.tokenizer = AutoTokenizer.from_pretrained("ElnaggarLab/ankh-base")
@@ -40,6 +41,7 @@ class Ankh(PLMEncoder):
 
 
 class ESM(PLMEncoder):
+    # 650M parameters
     def __init__(self, layer_num: int):
         super().__init__(layer_num)
         self.tokenizer = AutoTokenizer.from_pretrained("facebook/esm2_t33_650M_UR50D")
@@ -58,6 +60,7 @@ class ESM(PLMEncoder):
 
 
 class ProtBERT(PLMEncoder):
+    # 420M parameters ProtTrans paper
     def __init__(self, layer_num: int):
         super().__init__(layer_num)
         self.tokenizer = BertTokenizer.from_pretrained("Rostlab/prot_bert", do_lower_case=False)
@@ -81,6 +84,7 @@ class ProtBERT(PLMEncoder):
 
 
 class ProstT5(PLMEncoder):
+    #
     def __init__(self, layer_num: int):
         super().__init__(layer_num)
         self.tokenizer = T5Tokenizer.from_pretrained("Rostlab/ProstT5")

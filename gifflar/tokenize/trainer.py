@@ -1,18 +1,41 @@
 import pickle
 from collections import defaultdict
+from pathlib import Path
+
+from gifflar.tokenize.pretokenize import PreTokenizer
 
 
 class TokenizerTrainer:
-    def __init__(self, pre_tokenizer, corpus_path="iupacs.txt"):
+    def __init__(
+            self,
+            pre_tokenizer: PreTokenizer,
+            corpus_path: str | Path,
+            token_path: str | Path,
+            total_token: int | None | list[int] = None,
+            add_token: int | None | list[int] = None,
+            save_format: str | None = None
+    ):
         self.pre_tokenizer = pre_tokenizer
+        self.save_format = save_format or "{:03d}"
 
         with open(corpus_path, "r") as f:
             self.corpus = [line.strip().replace(" ", "") for line in f.readlines()]
+
+        self.vocab = self.init_vocab(token_path)
+
+        if isinstance(total_token, int) or isinstance(add_token, int):
+            self.vocab_size = total_token or len(self.vocab) + add_token
+        else:
+            self.vocab_steps = total_token or [len(self.vocab) + n for n in add_token]
+            self.vocab_size = self.vocab_steps[-1]
 
         self.pair_freqs = defaultdict(int)
         self.merges = {}
         self.splits = {}
         self.vocab = {}
+
+    def init_vocab(self, token_path):
+        raise NotImplementedError()
 
     def merge_pair(self, a, b):
         merge_token = a + b[2:] if b[:2] == "##" else a + b
@@ -40,17 +63,26 @@ class TokenizerTrainer:
     def save(self, path):
         with open(path, "wb") as f:
             pickle.dump((self.vocab, self.merges), f)
+        print(f"\nSaved to {path}")
 
 
 class BPETrainer(TokenizerTrainer):
-    def __init__(self, pre_tokenizer, token_path="gifflar/grammar/tokens.txt", corpus_path="iupacs.txt", num_token: int = 50):
-        super(BPETrainer, self).__init__(pre_tokenizer, corpus_path)
-
-        with open(token_path, "r") as f:
-            self.vocab = [v.strip() for v in f.readlines()]
-        self.vocab_size = num_token + len(self.vocab)
-
+    def __init__(
+            self,
+            pre_tokenizer,
+            corpus_path: str | Path,
+            token_path: str | Path,
+            total_token: int | None | list[int] = None,
+            add_token: int | None | list[int] = None,
+            save_format: str | None = None
+    ):
+        super(BPETrainer, self).__init__(pre_tokenizer, corpus_path, token_path, total_token, add_token, save_format)
         self.splits = {word: self.pre_tokenizer(word) for word in self.corpus}
+
+    def init_vocab(self, token_path):
+        with open(token_path, "r") as f:
+            vocab = [v.strip() for v in f.readlines()]
+        return vocab
 
     def compute_pair_freqs(self):
         for word in self.corpus:
@@ -73,23 +105,33 @@ class BPETrainer(TokenizerTrainer):
             self.pair_freqs, merge_token = self.merge_pair(*best_pair)
             self.merges[best_pair] = merge_token
             self.vocab.append(merge_token)
+            if len(self.vocab) in self.vocab_steps:
+                self.save(f"data/{self.save_format.format(len(self.vocab))}.pkl")
 
 
 class WordpieceTrainer(TokenizerTrainer):
-    def __init__(self, pre_tokenizer, token_path="gifflar/grammar/tokens.txt", corpus_path="iupacs.txt",
-                 num_token: int = 50):
-        super(WordpieceTrainer, self).__init__(pre_tokenizer, corpus_path)
+    def __init__(
+            self,
+            pre_tokenizer,
+            corpus_path: str | Path,
+            token_path: str | Path,
+            total_token: int | None | list[int] = None,
+            add_token: int | None | list[int] = None,
+            save_format: str | None = None,
+    ):
+        super(WordpieceTrainer, self).__init__(pre_tokenizer, corpus_path, token_path, total_token, add_token, save_format)
 
+        self.splits = {word: [t if i == 0 else "##" + t for i, t in enumerate(self.pre_tokenizer(word))] for word in
+                       self.corpus}
+        self.single_freqs = defaultdict(int)
+
+    def init_vocab(self, token_path):
         self.vocab = []
         with open(token_path, "r") as f:
             for v in f.readlines():
                 v = v.strip()
                 self.vocab += [v, f"##{v}"]
-        self.vocab_size = num_token + len(self.vocab)
-
-        self.splits = {word: [t if i == 0 else "##" + t for i, t in enumerate(self.pre_tokenizer(word))] for word in
-                       self.corpus}
-        self.single_freqs = defaultdict(int)
+        return self.vocab
 
     def compute_pair_scores(self):
         for word in self.corpus:
@@ -122,3 +164,5 @@ class WordpieceTrainer(TokenizerTrainer):
             self.single_freqs[best_pair[1]] -= freq
             self.single_freqs[merge_token] = freq
             self.vocab.append(merge_token)
+            if len(self.vocab) in self.vocab_steps:
+                self.save(f"data/{self.save_format.format(len(self.vocab))}.pkl")

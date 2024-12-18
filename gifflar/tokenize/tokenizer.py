@@ -1,5 +1,6 @@
 import pickle
 from pathlib import Path
+from typing import Literal
 
 import transformers
 from tokenizers import Tokenizer, models
@@ -9,17 +10,18 @@ from gifflar.tokenize.pretokenize import PreTokenizer
 
 
 class GIFFLARTokenizer(PreTrainedTokenizerFast):
-    def __init__(self, pre_tokenizer: PreTokenizer, base_vocab: list[str] | Path | str | None = None, *args, **kwargs):
+    def __init__(self, pre_tokenizer: PreTokenizer, mode: Literal["BPE", "WP"], base_vocab: list[str] | Path | str | None = None, *args, **kwargs):
         super(GIFFLARTokenizer, self).__init__(tokenizer_object=Tokenizer(models.Model()), *args, **kwargs)
         self.pre_tokenizer_ = pre_tokenizer
+        self.mode = mode
+        self.pad_token = "[PAD]"
         self.cls_token = "[CLS]"
         self.bos_token = "[BOS]"
         self.unk_token = "[UNK]"
         self.sep_token = "[SEP]"
         self.mask_token = "[MASK]"
         self.eos_token = "[EOS]"
-        self.pad_token = "[PAD]"
-        self.vocab_ = {}
+        self.vocab_ = {token: i for i, token in enumerate([self.pad_token, self.bos_token, self.unk_token, self.sep_token, self.mask_token, self.eos_token, self.cls_token])}
         if base_vocab is not None:
             if not isinstance(base_vocab, list):
                 with open(base_vocab, "r") as f:
@@ -32,32 +34,33 @@ class GIFFLARTokenizer(PreTrainedTokenizerFast):
         return len(self.vocab_)
 
     @property
-    def cls_token_id(self):
-        return len(self.vocab_)
+    def pad_token_id(self):
+        # This has to be 0 for some reason deep down the ESM processing
+        return 0
 
     @property
     def bos_token_id(self):
-        return len(self.vocab_) + 1
+        return 1
 
     @property
     def unk_token_id(self):
-        return len(self.vocab_) + 2
+        return 2
 
     @property
     def sep_token_id(self):
-        return len(self.vocab_) + 3
+        return 3
 
     @property
     def mask_token_id(self):
-        return len(self.vocab_) + 4
+        return 4
 
     @property
     def eos_token_id(self):
-        return len(self.vocab_) + 5
+        return 5
 
     @property
-    def pas_token_id(self):
-        return len(self.vocab_) + 6
+    def cls_token_id(self):
+        return 6
 
     def __len__(self):
         return len(self.vocab_)
@@ -94,10 +97,10 @@ class GIFFLARTokenizer(PreTrainedTokenizerFast):
     def load(self, path):
         with open(path, "rb") as f:
             base_vocab, self.merges = pickle.load(f)
-        self.vocab_ = {v: i for i, v in enumerate(base_vocab)}
+        self.vocab_.update({v: i + self.eos_token_id for i, v in enumerate(base_vocab)})
 
     def __call__(self, text, *args, **kwargs):
-        tokens = self.bpe_tokenize(text)
+        tokens = self.bpe_tokenize(text) if self.mode == "BPE" else self.wordpiece_tokenize(text)
         input_ids = []
         token_type_ids = []
         attention_mask = []
