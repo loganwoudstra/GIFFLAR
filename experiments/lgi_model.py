@@ -35,14 +35,20 @@ class LectinStorage(GlycanStorage):
             try:
                 self.data[aa_seq] = self.encoder(aa_seq)
             except Exception as e:
-                # print(e)
+                print(e)
                 self.data[aa_seq] = None
 
         return self.data[aa_seq]
 
     def batch_query(self, aa_seqs) -> torch.Tensor:
         # print([self.query(aa_seq) for aa_seq in aa_seqs])
-        return torch.stack([self.query(aa_seq) for aa_seq in aa_seqs])
+        results = [self.query(aa_seq) for aa_seq in aa_seqs]
+        dummy = None
+        for x in results:
+            if x is not None:
+                dummy = torch.zeros_like(x)
+                break
+        return torch.stack([dummy if res is None else res for res in results])
 
 
 class LGI_Model(LightningModule):
