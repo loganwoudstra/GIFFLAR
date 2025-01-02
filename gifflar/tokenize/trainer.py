@@ -19,7 +19,7 @@ class TokenizerTrainer:
         self.save_format = save_format or "{:03d}"
 
         with open(corpus_path, "r") as f:
-            self.corpus = [line.strip().replace(" ", "") for line in f.readlines()]
+            self.corpus = [line.replace("\n", "") for line in f.readlines()]
 
         self.vocab = self.init_vocab(token_path)
 
@@ -32,7 +32,6 @@ class TokenizerTrainer:
         self.pair_freqs = defaultdict(int)
         self.merges = {}
         self.splits = {}
-        self.vocab = {}
 
     def init_vocab(self, token_path):
         raise NotImplementedError()
@@ -77,7 +76,10 @@ class BPETrainer(TokenizerTrainer):
             save_format: str | None = None
     ):
         super(BPETrainer, self).__init__(pre_tokenizer, corpus_path, token_path, total_token, add_token, save_format)
-        self.splits = {word: self.pre_tokenizer(word) for word in self.corpus}
+        for word in self.corpus():
+            tokenization = self.pre_tokenizer(word)
+            if tokenization is not None:
+                self.splits[word] = tokenization
 
     def init_vocab(self, token_path):
         with open(token_path, "r") as f:
@@ -106,7 +108,7 @@ class BPETrainer(TokenizerTrainer):
             self.merges[best_pair] = merge_token
             self.vocab.append(merge_token)
             if len(self.vocab) in self.vocab_steps:
-                self.save(f"data/{self.save_format.format(len(self.vocab))}.pkl")
+                self.save(f"{self.save_format.format(len(self.vocab))}.pkl")
 
 
 class WordpieceTrainer(TokenizerTrainer):
@@ -120,9 +122,13 @@ class WordpieceTrainer(TokenizerTrainer):
             save_format: str | None = None,
     ):
         super(WordpieceTrainer, self).__init__(pre_tokenizer, corpus_path, token_path, total_token, add_token, save_format)
+        for word in self.corpus:
+            # print(word)
+            tokenization = self.pre_tokenizer(word)
+            # print(tokenization)
+            if tokenization is not None:
+                self.splits[word] = [t if i == 0 else "##" + t for i, t in enumerate(self.pre_tokenizer(word))]
 
-        self.splits = {word: [t if i == 0 else "##" + t for i, t in enumerate(self.pre_tokenizer(word))] for word in
-                       self.corpus}
         self.single_freqs = defaultdict(int)
 
     def init_vocab(self, token_path):
@@ -165,4 +171,4 @@ class WordpieceTrainer(TokenizerTrainer):
             self.single_freqs[merge_token] = freq
             self.vocab.append(merge_token)
             if len(self.vocab) in self.vocab_steps:
-                self.save(f"data/{self.save_format.format(len(self.vocab))}.pkl")
+                self.save(f"{self.save_format.format(len(self.vocab))}.pkl")

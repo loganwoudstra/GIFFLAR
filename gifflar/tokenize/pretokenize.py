@@ -1,3 +1,6 @@
+import sys
+import io
+
 import networkx as nx
 from antlr4.CommonTokenStream import CommonTokenStream
 from antlr4.InputStream import InputStream
@@ -5,6 +8,7 @@ from glycowork.motif.graph import glycan_to_nxGraph
 
 from glyles.grammar.GlycanLexer import GlycanLexer
 from glyles.grammar.GlycanParser import GlycanParser
+from glyles.glycans.poly.anltr_error_listener import GlyLESErrorListener
 
 
 def graph_to_token_stream_int(graph):
@@ -125,8 +129,32 @@ class GlycoworkPreTokenizer(PreTokenizer):
 
 
 class GrammarPreTokenizer(PreTokenizer):
+    def __init__(self):
+        self.io = io.StringIO()
+
     def __call__(self, iupac: str):
+        # self.io.truncate(0)
         iupac = iupac.strip().replace(" ", "")
-        token = CommonTokenStream(GlycanLexer(InputStream(data="#" + iupac + "#")))
-        GlycanParser(token).start()
+        token = CommonTokenStream(lexer := GlycanLexer(InputStream(data="#" + iupac + "#")))  # ), output=self.io))
+        parser = GlycanParser(token)  # , output=self.io).start()
+
+        lexer.removeErrorListeners()
+        lexer.addErrorListener(GlyLESErrorListener())
+        parser.removeErrorListeners()
+        parser.addErrorListener(GlyLESErrorListener())
+
+        try:
+            parser.start()
+        except Exception as e:
+            with open("lm_logs.txt", "a") as f:
+                print(iupac, ":", e, file=f)
+            print(iupac, ":", e)
+            return None
+
         return [t.text for t in token.tokens[1:-2]]
+        # self.io.seek(0)
+        # content = self.io.read()
+        # if len(content) == 0:
+        #     return [t.text for t in token.tokens[1:-2]]
+        # print(iupac, "->", content)
+        # return None
