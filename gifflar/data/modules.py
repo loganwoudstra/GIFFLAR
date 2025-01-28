@@ -12,7 +12,7 @@ from gifflar.data.hetero import hetero_collate
 class GlycanDataModule(LightningDataModule):
     """DataModule holding datasets for Glycan-specific training"""
 
-    def __init__(self, batch_size: int = 128, num_workers: int = 1, **kwargs: Any):
+    def __init__(self, batch_size: int = 128, num_workers: int = 0, **kwargs: Any):
         """
         Initialize the DataModule with a given batch size.
 
@@ -78,6 +78,7 @@ class PretrainGDM(GlycanDataModule):
             train_frac: float = 0.8,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
+            num_workers: int = 0,
             **kwargs: Any,
     ):
         """
@@ -94,7 +95,7 @@ class PretrainGDM(GlycanDataModule):
             **kwargs: Additional arguments to pass to the Pretrain
         """
         root = Path(file_path).parent
-        super().__init__(batch_size)
+        super().__init__(batch_size, num_workers=num_workers)
         ds = PretrainGDs(root=root, filename=file_path, hash_code=hash_code, transform=transform,
                          pre_transform=pre_transform, **kwargs)
         self.train, self.val = torch.utils.data.dataset.random_split(ds, [train_frac, 1 - train_frac])
@@ -114,6 +115,7 @@ class DownsteamGDM(GlycanDataModule):
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
             force_reload: bool = False,
+            num_workers: int = 0,
             **dataset_args: dict[str, Any],
     ):
         """
@@ -128,7 +130,7 @@ class DownsteamGDM(GlycanDataModule):
             pre_transform: The pre-transform to apply to the data
             **dataset_args: Additional arguments to pass to the DownstreamGDs
         """
-        super().__init__(batch_size)
+        super().__init__(batch_size, num_workers=num_workers)
         self.train = self.ds_class(
             root=root, filename=filename, split="train", hash_code=hash_code, transform=transform,
             pre_transform=pre_transform, force_reload=force_reload, **dataset_args,

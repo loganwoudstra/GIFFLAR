@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 from argparse import ArgumentParser
 import time
@@ -51,7 +51,7 @@ def train(**kwargs):
 
     datamodule = LGI_GDM(
         root=kwargs["root_dir"], filename=kwargs["origin"], hash_code=kwargs["hash"],
-        batch_size=kwargs["model"].get("batch_size", 1), transform=None,
+        batch_size=kwargs["model"].get("batch_size", 1), transform=None, num_workers=12,
         pre_transform=get_pretransforms("", **(kwargs["pre-transforms"] or {})),
     )
 
@@ -74,7 +74,7 @@ def train(**kwargs):
 
     trainer = Trainer(
         callbacks=[
-            ModelCheckpoint(dirpath=Path(kwargs["logs_dir"]) / "full", monitor="val/loss"),
+            ModelCheckpoint(dirpath=Path(kwargs["logs_dir"]) / f"LGI_{glycan_model_name}{lectin_model_name}" / "weights", monitor="val/loss"),
             RichProgressBar(), 
             RichModelSummary(),
         ],

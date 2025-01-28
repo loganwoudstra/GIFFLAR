@@ -42,7 +42,13 @@ class LectinStorage(GlycanStorage):
 
     def batch_query(self, aa_seqs) -> torch.Tensor:
         # print([self.query(aa_seq) for aa_seq in aa_seqs])
-        return torch.stack([self.query(aa_seq) for aa_seq in aa_seqs])
+        results = [self.query(aa_seq) for aa_seq in aa_seqs]
+        dummy = None
+        for x in results:
+            if x is not None:
+                dummy = torch.zeros_like(x)
+                break
+        return torch.stack([dummy if res is None else res for res in results])
 
 
 class LGI_Model(LightningModule):

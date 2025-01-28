@@ -20,7 +20,7 @@ class LGI_OnDiskDataset(GlycanOnDiskDataset):
 
 
 def get_ds(dl, split_idx: int):
-    ds = LGI_OnDiskDataset(root="/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/glycowork_data", path_idx=split_idx)
+    ds = LGI_OnDiskDataset(root="/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/glycowork_full", path_idx=split_idx)
     data = []
     for x in tqdm(dl):
         data.append(Data(
@@ -70,22 +70,22 @@ def collate_lgi(data):
     )
 
 datamodule = LGI_GDM(
-    root="/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/lgi_data", filename="/home/rjo21/Desktop/GIFFLAR/lgi_data_20.pkl", hash_code="8b34af2a",
+    root="/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/lgi_data", filename="/home/rjo21/Desktop/GIFFLAR/lgi_data_full.pkl", hash_code="8b34af2a",
     batch_size=1, transform=None, pre_transform={"GIFFLARTransform": "", "SweetNetTransform": ""},
 )
 
-#get_ds(datamodule.train_dataloader(), 0)
-#get_ds(datamodule.val_dataloader(), 1)
-#get_ds(datamodule.test_dataloader(), 2)
+get_ds(datamodule.train_dataloader(), 0)
+get_ds(datamodule.val_dataloader(), 1)
+get_ds(datamodule.test_dataloader(), 2)
 
-train_set = LGI_OnDiskDataset("/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/glycowork_data", path_idx=0)
-val_set = LGI_OnDiskDataset("/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/glycowork_data", path_idx=1)
+train_set = LGI_OnDiskDataset("/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/glycowork_full", path_idx=0)
+val_set = LGI_OnDiskDataset("/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/glycowork_full", path_idx=1)
 
 model = prep_model("LectinOracle", num_classes=1)
 optimizer = torch.optim.Adam(model.parameters())
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
 
-m = train_model(
+m, met = train_model(
     model=model,
     dataloaders={"train": torch.utils.data.DataLoader(train_set, batch_size=128, collate_fn=collate_lgi), 
                  "val": torch.utils.data.DataLoader(val_set, batch_size=128, collate_fn=collate_lgi)},
@@ -100,5 +100,8 @@ m = train_model(
 
 import pickle
 
-with open("lectinoracle_metrics.pkl", "wb") as f:
+with open("lectinoracle_full_model.pkl", "wb") as f:
     pickle.dump(m, f)
+with open("lectinoracle_full_metrics.pkl", "wb") as f:
+    pickle.dump(met, f)
+
