@@ -87,13 +87,49 @@ def train(**kwargs):
     print("Training took", time.time() - start, "s")
 
 
-def main(config):
+def train_contrastive(**kwargs):
+    kwargs["pre-transforms"] = {"GIFFLARTransform": "", "SweetNetTransform": ""}
+    kwargs["hash"] = hash_dict(kwargs["pre-transforms"])
+    seed_everything(kwargs["seed"])
+
+    datamodule = LGI_GDM(
+        root=kwargs["root_dir"], filename=kwargs["origin"], hash_code=kwargs["hash"],
+        batch_size=kwargs["model"].get("batch_size", 1), transform=None,
+        pre_transform=get_pretransforms("", **(kwargs["pre-transforms"] or {})),
+    )
+
+    # set up the logger
+    glycan_model_name = kwargs["model"]["glycan_encoder"]["name"] + (
+            kwargs["model"]["glycan_encoder"].get("suffix", None) or "")
+    lectin_model_name = kwargs["model"]["lectin_encoder"]["name"] + (
+            kwargs["model"]["lectin_encoder"].get("suffix", None) or "")
+    logger = CSVLogger(kwargs["logs_dir"], name="LGI_" + glycan_model_name + lectin_model_name)
+    logger.log_hyperparams(kwargs)
+
+    glycan_encoder = GLYCAN_ENCODERS[kwargs["model"]["glycan_encoder"]["name"]](**kwargs["model"]["glycan_encoder"])
+    model = LGI_Model(
+        glycan_encoder,
+        kwargs["model"]["lectin_encoder"]["name"],
+        kwargs["model"]["lectin_encoder"]["layer_num"],
+        **kwargs,
+    )
+    model.to("cuda")
+
+
+def main(mode, config):
     custom_args = read_yaml_config(config)
     for args in unfold_config(custom_args):
-        train(**args)
+        if mode == "classical":
+            train(**args)
+        elif mode == "contrastive":
+            train_contrastive(**args)
+        else:
+            raise ValueError("Invalid mode. Choices are 'classical' and 'contrastive'.")
 
 
 if __name__ == '__main__':
     parser = ArgumentParser()
+    parser.add_argument("mode", type=str, help="Run classical DTI training or contrastive training", choices=["classical", "contrastive"])
     parser.add_argument("config", type=str, help="Path to YAML config file")
-    main(parser.parse_args().config)
+    args = parser.parse_args()
+    main(args.mode, args.config)
