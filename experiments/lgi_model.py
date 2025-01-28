@@ -24,7 +24,7 @@ class LectinStorage(GlycanStorage):
                 otherwise, such file will be created.
         """
         self.path = Path(path or "data") / f"{lectin_encoder}_{le_layer_num}.pkl"
-        # print("Path:", self.path.resolve())
+        print("Loading LectinStorage from:", self.path.resolve())
         self.path.parent.mkdir(parents=True, exist_ok=True)
         
         self.encoder = ENCODER_MAP[lectin_encoder](le_layer_num)
@@ -35,9 +35,9 @@ class LectinStorage(GlycanStorage):
             try:
                 self.data[aa_seq] = self.encoder(aa_seq)
             except Exception as e:
-                # print(e)
+                print(e)
                 self.data[aa_seq] = None
-
+        
         return self.data[aa_seq]
 
     def batch_query(self, aa_seqs) -> torch.Tensor:

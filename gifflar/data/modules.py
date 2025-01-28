@@ -63,7 +63,7 @@ class GlycanDataModule(LightningDataModule):
             DataLoader for the combined data
         """
         predict = ConcatDataset([self.train, self.val, self.test])
-        return DataLoader(predict, batch_size=1, shuffle=False,
+        return DataLoader(predict, batch_size=min(self.batch_size, len(predict)), shuffle=False,
                           collate_fn=hetero_collate, num_workers=self.num_workers)
 
 

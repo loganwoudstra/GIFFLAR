@@ -76,10 +76,12 @@ class BPETrainer(TokenizerTrainer):
             save_format: str | None = None
     ):
         super(BPETrainer, self).__init__(pre_tokenizer, corpus_path, token_path, total_token, add_token, save_format)
-        for word in self.corpus():
+        for word in self.corpus:
             tokenization = self.pre_tokenizer(word)
             if tokenization is not None:
                 self.splits[word] = tokenization
+        with open(self.save_format.format('splits'), "wb") as f:
+            pickle.dump(self.splits, f)
 
     def init_vocab(self, token_path):
         with open(token_path, "r") as f:
@@ -98,7 +100,8 @@ class BPETrainer(TokenizerTrainer):
     def train(self):
         self.compute_pair_freqs()
         while len(self.vocab) < self.vocab_size:
-            print(f"\rVocab-size: {len(self.vocab)} / {self.vocab_size}", end="")
+            # print(f"\rVocab-size: {len(self.vocab)} / {self.vocab_size}", end="")
+            # print(f"Vocab-size: {len(self.vocab)} / {self.vocab_size}")
             best_pair, max_freq = "", None
             for pair, freq in self.pair_freqs.items():
                 if max_freq is None or max_freq < freq:
@@ -108,7 +111,7 @@ class BPETrainer(TokenizerTrainer):
             self.merges[best_pair] = merge_token
             self.vocab.append(merge_token)
             if len(self.vocab) in self.vocab_steps:
-                self.save(f"{self.save_format.format(len(self.vocab))}.pkl")
+                self.save(self.save_format.format(len(self.vocab)))
 
 
 class WordpieceTrainer(TokenizerTrainer):
@@ -128,6 +131,9 @@ class WordpieceTrainer(TokenizerTrainer):
             # print(tokenization)
             if tokenization is not None:
                 self.splits[word] = [t if i == 0 else "##" + t for i, t in enumerate(self.pre_tokenizer(word))]
+
+        with open(self.save_format.format('splits'), "wb") as f:
+            pickle.dump(self.splits, f)
 
         self.single_freqs = defaultdict(int)
 
@@ -154,7 +160,8 @@ class WordpieceTrainer(TokenizerTrainer):
     def train(self):
         self.compute_pair_scores()
         while len(self.vocab) < self.vocab_size:
-            print(f"\rVocab-size: {len(self.vocab)} / {self.vocab_size}", end="")
+            # print(f"\rVocab-size: {len(self.vocab)} / {self.vocab_size}", end="")
+            # print(f"Vocab-size: {len(self.vocab)} / {self.vocab_size}")
             scores = {
                 pair: freq / (self.single_freqs[pair[0]] * self.single_freqs[pair[1]])
                 for pair, freq in self.pair_freqs.items()
