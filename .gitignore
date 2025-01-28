@@ -7,3 +7,4 @@ data/*
 *.tsv
 tests/data/*
 tests/logs/*
+./*.csv
