@@ -29,7 +29,7 @@ DISTANCES = {
 }
 
 
-class ContrastLGIModel(LightningModule):
+class ContrastLGIModel(LGI_Model):
     def __init__(
             self,
             glycan_encoder: GlycanGIN | SweetNetLightning,

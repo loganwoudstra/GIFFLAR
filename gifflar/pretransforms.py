@@ -499,13 +499,17 @@ class TQDMCompose(Compose):
         Returns:
             The transformed data
         """
-        print("TQDM Pretransformation")
-        for transform in tqdm(self.transforms, desc=f"Transform"):
+        for transform in tqdm(self.transforms, desc=f"TQDM Transform"):
             if not isinstance(data, (list, tuple)):
-                data = transform(data)
+                output = transform(data)
             else:
-                data = [transform(d) for d in tqdm(data, desc=str(transform), leave=False)]
-        return data
+                output = []
+                for d in tqdm(data, desc=str(transform), leave=False):
+                    if isinstance(d, (Data, HeteroData)):
+                        output.append(transform(d))
+                    elif isinstance(d, (list, tuple)):
+                        output.append([transform(dd) for dd in d])
+        return output
 
 
 def get_pretransforms(dataset_name: str = "", **pre_transform_args: dict[str, dict]) -> TQDMCompose:

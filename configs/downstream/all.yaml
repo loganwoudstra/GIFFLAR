@@ -8,6 +8,8 @@ datasets:
   #  task: classification
   #- name: Glycosylation
   #  task: classification
+  - name: Tissue
+    task: multilabel
   - name: Taxonomy_Domain
     task: multilabel
   - name: Taxonomy_Kingdom

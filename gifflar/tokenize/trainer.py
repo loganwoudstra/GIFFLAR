@@ -85,6 +85,9 @@ class BPETrainer(TokenizerTrainer):
             if tokenization is not None:
                 self.splits[word] = tokenization
         self.corpus = list(self.splits.keys())
+        
+        with open(self.save_format.format('splits'), "wb") as f:
+            pickle.dump(self.splits, f)
 
     def init_vocab(self, token_path):
         with open(token_path, "r") as f:
@@ -105,7 +108,8 @@ class BPETrainer(TokenizerTrainer):
         print(f"Starting Vocab-size: {len(self.vocab)}")
         print("Corpus-size: ", len(self.corpus))
         while len(self.vocab) < self.vocab_size:
-            print(f"\rVocab-size: {len(self.vocab)} / {self.vocab_size}", end="")
+            # print(f"\rVocab-size: {len(self.vocab)} / {self.vocab_size}", end="")
+            # print(f"Vocab-size: {len(self.vocab)} / {self.vocab_size}")
             best_pair, max_freq = "", None
             for pair, freq in self.pair_freqs.items():
                 if max_freq is None or max_freq < freq:
@@ -135,6 +139,9 @@ class WordpieceTrainer(TokenizerTrainer):
                 self.splits[word] = [t if i == 0 else "##" + t for i, t in enumerate(tokenization)]
         self.corpus = list(self.splits.keys())
 
+        with open(self.save_format.format('splits'), "wb") as f:
+            pickle.dump(self.splits, f)
+
         self.single_freqs = defaultdict(int)
 
     def init_vocab(self, token_path):
@@ -162,7 +169,8 @@ class WordpieceTrainer(TokenizerTrainer):
         print(f"Starting Vocab-size: {len(self.vocab)}")
         print("Corpus-size: ", len(self.corpus))
         while len(self.vocab) < self.vocab_size:
-            print(f"\rVocab-size: {len(self.vocab)} / {self.vocab_size}", end="")
+            # print(f"\rVocab-size: {len(self.vocab)} / {self.vocab_size}", end="")
+            # print(f"Vocab-size: {len(self.vocab)} / {self.vocab_size}")
             scores = {
                 pair: freq / (self.single_freqs[pair[0]] * self.single_freqs[pair[1]])
                 for pair, freq in self.pair_freqs.items()

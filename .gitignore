@@ -14,3 +14,4 @@ lightning_logs/*
 *.png
 *.pdf
 *.pkl
+*.pkl

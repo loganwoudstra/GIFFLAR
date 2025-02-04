@@ -76,7 +76,6 @@ class GlycanOnDiskDataset(OnDiskDataset):
         """
 
         """
-        
         db = self.get_db(path_idx)
         if len(data) != 0:
             db.multi_insert(range(len(data)), data, batch_size=None)
@@ -156,10 +155,9 @@ class GlycanDataset(GlycanOnDiskDataset):
         if self.pre_filter is not None:
             data = [d for d in data if self.pre_filter(d)]
         if self.pre_transform is not None:
-            print("Pre-Transform")
             data = self.pre_transform(data)
 
-        super().process_(data, path_idx)
+        super(GlycanDataset, self).process_(data, path_idx)
 
 
 class PretrainGDs(GlycanDataset):
@@ -302,8 +300,6 @@ class DownstreamGDs(GlycanDataset):
 class LGIDataset(DownstreamGDs):
     def process(self) -> None:
         """Process the data and store it."""
-        # print("Processing", self.filename)
-        # traceback.print_stack()
         if str(self.filename).endswith(".pkl"):
             self.process_pkl()
         elif str(self.filename)[-4:] in {".csv", ".tsv"}:
@@ -343,6 +339,59 @@ class LGIDataset(DownstreamGDs):
             d["y"] = torch.tensor([getattr(row, "y", 0)])
             d["ID"] = i
             data[getattr(row, "split", "train")].append(d)
+        
+        gs.close()
+        print("Processed", sum(len(v) for v in data.values()), "entries")
+        for split in self.splits:
+            print("Post-process", split)
+            self.process_(data[split], path_idx=self.splits[split])
+
+class ContrastiveLGIDataset(LGIDataset):
+    def process_pkl(self) -> None:
+        data = {k: [] for k in self.splits}
+        with open(self.filename, "rb") as f:
+            lgis = pickle.load(f)
+
+        # Load the glycan storage to speed up the preprocessing
+        gs = GlycanStorage(Path(self.root).parent)
+        for i, (lectin, glycan, glycan_val, decoy, decoy_val, split) in tqdm(enumerate(lgis)):
+            try:
+                d = gs.query(glycan)
+                if d is None:
+                    continue
+                d["aa_seq"] = lectin
+                d["y"] = torch.tensor([glycan_val])
+                d["ID"] = i
+
+                decoy = gs.query(decoy)
+                decoy["y"] = torch.tensor([decoy_val])
+                decoy["ID"] = i
+
+                data[split].append((d, decoy))
+            except Exception as e:
+                print(e)
+                continue
+
+        gs.close()
+        print("Processed", sum(len(v) for v in data.values()), "entries")
+        for split in self.splits:
+            print("Post-process", split)
+            self.process_(data[split], path_idx=self.splits[split])
+
+    def process_csv(self, sep):
+        data = {k: [] for k in self.splits}
+        inter = pd.read_csv(self.filename, sep=sep)
+        gs = GlycanStorage(Path(self.root).parent)
+        for i, (_, row) in tqdm(enumerate(inter.iterrows())):
+            d = gs.query(row["IUPAC"])
+            if d is None:
+                continue
+            d["aa_seq"] = row["seq"]
+            d["y"] = torch.tensor([getattr(row, "y", 0)])
+            d["ID"] = i
+            decoy = gs.query(getattr(row, "decoy", None))
+
+            data[getattr(row, "split", "train")].append((d, decoy))
         
         gs.close()
         print("Processed", sum(len(v) for v in data.values()), "entries")

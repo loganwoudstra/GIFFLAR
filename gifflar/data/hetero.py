@@ -177,3 +177,8 @@ def hetero_collate(data: Optional[Union[list[list[HeteroData]], list[HeteroData]
     # Finally create and return the HeteroDataBatch
     return HeteroDataBatch(x_dict=x_dict, edge_index_dict=edge_index_dict, edge_attr_dict=edge_attr_dict,
                            num_nodes=num_nodes, batch_dict=batch_dict, **kwargs)
+
+
+def hetero_tuple_collate(data: list[tuple[HeteroData, HeteroData]], *args, **kwargs: Any) -> tuple[HeteroDataBatch, HeteroDataBatch]:
+    data, decoys = tuple(list(*zip(data)))
+    return hetero_collate(data), hetero_collate(decoys)
