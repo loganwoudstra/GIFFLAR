@@ -1,5 +1,7 @@
 import os
-# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
+from experiments.contrastive_model import ContrastLGIModel
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 from argparse import ArgumentParser
 import time
@@ -11,7 +13,7 @@ from pytorch_lightning.loggers import CSVLogger
 from torch_geometric import seed_everything
 
 from experiments.lgi_model import LGI_Model
-from gifflar.data.modules import LGI_GDM
+from gifflar.data.modules import LGI_GDM, ConstrastiveGDM
 from gifflar.model.baselines.sweetnet import SweetNetLightning
 from gifflar.model.downstream import DownstreamGGIN
 from gifflar.pretransforms import get_pretransforms
@@ -92,7 +94,7 @@ def train_contrastive(**kwargs):
     kwargs["hash"] = hash_dict(kwargs["pre-transforms"])
     seed_everything(kwargs["seed"])
 
-    datamodule = LGI_GDM(
+    datamodule = ConstrastiveGDM(
         root=kwargs["root_dir"], filename=kwargs["origin"], hash_code=kwargs["hash"],
         batch_size=kwargs["model"].get("batch_size", 1), transform=None,
         pre_transform=get_pretransforms("", **(kwargs["pre-transforms"] or {})),
@@ -107,13 +109,29 @@ def train_contrastive(**kwargs):
     logger.log_hyperparams(kwargs)
 
     glycan_encoder = GLYCAN_ENCODERS[kwargs["model"]["glycan_encoder"]["name"]](**kwargs["model"]["glycan_encoder"])
-    model = LGI_Model(
+    model = ContrastLGIModel(
         glycan_encoder,
         kwargs["model"]["lectin_encoder"]["name"],
         kwargs["model"]["lectin_encoder"]["layer_num"],
         **kwargs,
     )
     model.to("cuda")
+
+    trainer = Trainer(
+        callbacks=[
+            ModelCheckpoint(dirpath=Path(kwargs["logs_dir"]) / f"LGI_{glycan_model_name}{lectin_model_name}" / "weights", monitor="val/loss"),
+            RichProgressBar(), 
+            RichModelSummary(),
+        ],
+        logger=logger,
+        max_epochs=kwargs["model"]["epochs"],
+        accelerator="gpu",
+        limit_train_batches=10,
+        limit_val_batches=10,
+    )
+    start = time.time()
+    trainer.fit(model, datamodule)
+    print("Training took", time.time() - start, "s")
 
 
 def main(mode, config):

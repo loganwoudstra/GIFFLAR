@@ -5,14 +5,21 @@ import torch
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import ConcatDataset, DataLoader
 
-from gifflar.data.datasets import DownstreamGDs, PretrainGDs, LGIDataset
-from gifflar.data.hetero import hetero_collate
+from gifflar.data.datasets import DownstreamGDs, PretrainGDs, LGIDataset, ContrastiveLGIDataset
+from gifflar.data.hetero import hetero_collate, hetero_tuple_collate
 
 
 class GlycanDataModule(LightningDataModule):
     """DataModule holding datasets for Glycan-specific training"""
 
-    def __init__(self, batch_size: int = 128, num_workers: int = 0, **kwargs: Any):
+    collate_fn = hetero_collate
+
+    def __init__(
+            self,
+            batch_size: int = 128,
+            num_workers: int = 1,
+            **kwargs: Any
+    ):
         """
         Initialize the DataModule with a given batch size.
 
@@ -33,7 +40,7 @@ class GlycanDataModule(LightningDataModule):
             DataLoader for the training data
         """
         return DataLoader(self.train, batch_size=min(self.batch_size, len(self.train)), shuffle=True,
-                          collate_fn=hetero_collate, num_workers=self.num_workers)
+                          collate_fn=self.collate_fn, num_workers=self.num_workers)
 
     def val_dataloader(self) -> DataLoader:
         """
@@ -43,7 +50,7 @@ class GlycanDataModule(LightningDataModule):
             DataLoader for the validation data
         """
         return DataLoader(self.val, batch_size=min(self.batch_size, len(self.val)), shuffle=False,
-                          collate_fn=hetero_collate, num_workers=self.num_workers)
+                          collate_fn=self.collate_fn, num_workers=self.num_workers)
 
     def test_dataloader(self) -> DataLoader:
         """
@@ -53,7 +60,7 @@ class GlycanDataModule(LightningDataModule):
             DataLoader for the test data
         """
         return DataLoader(self.test, batch_size=min(self.batch_size, len(self.test)), shuffle=False,
-                          collate_fn=hetero_collate, num_workers=self.num_workers)
+                          collate_fn=self.collate_fn, num_workers=self.num_workers)
 
     def predict_dataloader(self) -> DataLoader:
         """
@@ -63,8 +70,8 @@ class GlycanDataModule(LightningDataModule):
             DataLoader for the combined data
         """
         predict = ConcatDataset([self.train, self.val, self.test])
-        return DataLoader(predict, batch_size=min(self.batch_size, len(predict)), shuffle=False,
-                          collate_fn=hetero_collate, num_workers=self.num_workers)
+        return DataLoader(predict, batch_size=1, shuffle=False,
+                          collate_fn=self.collate_fn, num_workers=self.num_workers)
 
 
 class PretrainGDM(GlycanDataModule):
@@ -101,7 +108,7 @@ class PretrainGDM(GlycanDataModule):
         self.train, self.val = torch.utils.data.dataset.random_split(ds, [train_frac, 1 - train_frac])
 
 
-class DownsteamGDM(GlycanDataModule):
+class DownstreamGDM(GlycanDataModule):
     """DataModule for downstream tasks on glycan data."""
 
     ds_class = DownstreamGDs
@@ -144,5 +151,11 @@ class DownsteamGDM(GlycanDataModule):
             pre_transform=pre_transform, **dataset_args,
         )
 
-class LGI_GDM(DownsteamGDM):
+
+class LGI_GDM(DownstreamGDM):
     ds_class = LGIDataset
+
+
+class ConstrastiveGDM(DownstreamGDM):
+    ds_class = ContrastiveLGIDataset
+    collate_fn = hetero_tuple_collate
