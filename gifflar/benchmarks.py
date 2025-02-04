@@ -71,6 +71,27 @@ def get_taxonomic_level(
     return p
 
 
+def get_tissue(root: Path | str) -> Path:
+    """
+    Load the tissue data, process it, and save it as a tsv file.
+
+    Args:
+        root: The root directory to save the data to.
+    
+    Returns:
+        The filepath of the processed tissue data.
+    """
+    if not (p := (root / Path("immunogenicity.tsv"))).exists():
+        # Process the data and remove unnecessary columns
+        df = pd.read_csv("tissue_multilabel_df.csv")
+        df.rename(columns={"glycan": "IUPAC"}, inplace=True)
+        df.dropna(inplace=True)
+
+        df["split"] = np.random.choice(["train", "val", "test"], df.shape[0], p=[0.7, 0.2, 0.1])
+        df.to_csv(p, sep="\t", index=False)
+    return p
+
+
 def get_immunogenicity(root: Path | str) -> Path:
     """
     Download immunogenicity data, process it, and save it as a tsv file.
@@ -85,7 +106,7 @@ def get_immunogenicity(root: Path | str) -> Path:
         # Download the data
         urllib.request.urlretrieve(
             "https://torchglycan.s3.us-east-2.amazonaws.com/downstream/glycan_immunogenicity.csv",
-            "immunogenicity.csv"
+            root / "immunogenicity.csv"
         )
 
         # Process the data and remove unnecessary columns
@@ -116,10 +137,10 @@ def get_glycosylation(root: Path | str) -> Path:
     Returns:
         The filepath of the processed glycosylation data.
     """
-    if not (p := Path("glycosylation.tsv")).exists():
+    if not (p := root / Path("glycosylation.tsv")).exists():
         urllib.request.urlretrieve(
             "https://torchglycan.s3.us-east-2.amazonaws.com/downstream/glycan_properties.csv",
-            "glycosylation.csv"
+            root / "glycosylation.csv"
         )
         df = pd.read_csv("glycosylation.csv")[["glycan", "link"]]
         df.rename(columns={"glycan": "IUPAC"}, inplace=True)
@@ -153,6 +174,8 @@ def get_dataset(data_config: dict, root: Path | str) -> dict:
     match name_fracs[0]:
         case "Taxonomy":
             path = get_taxonomic_level(root, name_fracs[1])
+        case "Tissue":
+            path = get_tissue(root)
         case "Immunogenicity":
             path = get_immunogenicity(root)
         case "Glycosylation":
