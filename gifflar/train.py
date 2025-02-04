@@ -20,6 +20,7 @@ from gifflar.model.baselines.rgcn import RGCN
 from gifflar.model.baselines.sweetnet import SweetNetLightning
 from gifflar.benchmarks import get_dataset
 from gifflar.model.downstream import DownstreamGGIN
+from gifflar.model.glylm import GlycanLM
 from gifflar.model.pretrain import PretrainGGIN
 from gifflar.pretransforms import get_pretransforms
 from gifflar.transforms import get_transforms
@@ -33,6 +34,7 @@ MODELS = {
     "mlp": MLP,
     "rgcn": RGCN,
     "sweetnet": SweetNetLightning,
+    "glylm": GlycanLM,
 }
 
 
@@ -57,7 +59,7 @@ def setup(count: int = 4, **kwargs: Any) -> tuple[dict, DownsteamGDM, Logger | N
     datamodule = DownsteamGDM(
         root=kwargs["root_dir"], filename=data_config["filepath"], hash_code=kwargs["hash"],
         batch_size=kwargs["model"].get("batch_size", 1), transform=None,
-        pre_transform=get_pretransforms(data_config["name"], **(kwargs["pre-transforms"] or {})), dataset_args=data_config,
+        pre_transform=get_pretransforms(data_config["name"], **(kwargs.get("pre-transforms", None) or {})), **data_config,
     )
     data_config["num_classes"] = datamodule.train.dataset_args["num_classes"]
     kwargs["dataset"]["filepath"] = str(data_config["filepath"])
@@ -140,7 +142,7 @@ def train(**kwargs: Any) -> None:
     """
     data_config, datamodule, logger, _ = setup(3, **kwargs)
     model = MODELS[kwargs["model"]["name"]](output_dim=data_config["num_classes"], task=data_config["task"],
-                                            pre_transform_args=kwargs["pre-transforms"], **kwargs["model"])
+                                            pre_transform_args=kwargs.get("pre-transforms", {}), **kwargs["model"])
     trainer = Trainer(
         callbacks=[
             RichModelSummary(),
@@ -223,7 +225,7 @@ def embed(prep_args: dict[str, str], **kwargs: Any) -> None:
 def main(config: str | Path) -> None:
     """Main routine starting (pre-)training and embedding data using a pretrained model."""
     custom_args = read_yaml_config(config)
-    custom_args["hash"] = hash_dict(custom_args["pre-transforms"])
+    custom_args["hash"] = hash_dict(custom_args.get("pre-transforms", {}))
     if "root_dir" in custom_args:
         for args in unfold_config(custom_args):
             print(args)

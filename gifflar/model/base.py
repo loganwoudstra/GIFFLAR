@@ -46,7 +46,7 @@ class GlycanGIN(LightningModule):
         self.embedding = MultiEmbedding({
             "atoms": nn.Embedding(len(atom_map) + 2, rand_dim, _freeze=True),
             "bonds": nn.Embedding(len(bond_map) + 2, rand_dim, _freeze=True),
-            "monosacchs": nn.Embedding(len(lib) + 2, rand_dim, _freeze=True),
+            "monosacchs": nn.Embedding(2368, rand_dim, _freeze=True),  # len(lib) + 2
         })
 
         # Define the GIN layers to embed messages between nodes

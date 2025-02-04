@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Literal, Any
 
 import torch
@@ -7,7 +8,43 @@ from torch_geometric.utils import softmax
 from torch_geometric.nn import GINConv, global_mean_pool
 from torch_scatter import scatter_add
 
+from gifflar.data.utils import GlycanStorage
 from gifflar.utils import get_metrics
+
+
+class LectinStorage(GlycanStorage):
+    def __init__(self, encoder, lectin_encoder: str, le_layer_num: int, path: str | None = None):
+        """
+        Initialize the wrapper around a dict.
+
+        Args:
+            path: Path to the directory. If there's a lectin_storage.pkl, it will be used to fill this object,
+                otherwise, such file will be created.
+        """
+        self.path = Path(path or "data") / f"{lectin_encoder}_{le_layer_num}.pkl"
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        
+        self.encoder = encoder
+        self.data = self._load()
+
+    def query(self, aa_seq: str) -> torch.Tensor:
+        if aa_seq not in self.data:
+            try:
+                self.data[aa_seq] = self.encoder(aa_seq)
+            except Exception as e:
+                print(e)
+                self.data[aa_seq] = None
+
+        return self.data[aa_seq]
+
+    def batch_query(self, aa_seqs) -> torch.Tensor:
+        results = [self.query(aa_seq) for aa_seq in aa_seqs]
+        dummy = None
+        for x in results:
+            if x is not None:
+                dummy = torch.zeros_like(x)
+                break
+        return torch.stack([dummy if res is None else res for res in results])
 
 
 class MultiGlobalAttention(nn.Module):

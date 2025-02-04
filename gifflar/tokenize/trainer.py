@@ -18,8 +18,12 @@ class TokenizerTrainer:
         self.pre_tokenizer = pre_tokenizer
         self.save_format = save_format or "{:03d}"
 
-        with open(corpus_path, "r") as f:
-            self.corpus = [line.replace("\n", "") for line in f.readlines()]
+        if Path(corpus_path).suffix == ".txt":
+            with open(corpus_path, "r") as f:
+                self.corpus = [line.replace("\n", "") for line in f.readlines()]
+        elif Path(corpus_path).suffix == ".pkl":
+            with open(corpus_path, "rb") as f:
+                self.corpus = pickle.load(f)[0]
 
         self.vocab = self.init_vocab(token_path)
 
@@ -76,10 +80,11 @@ class BPETrainer(TokenizerTrainer):
             save_format: str | None = None
     ):
         super(BPETrainer, self).__init__(pre_tokenizer, corpus_path, token_path, total_token, add_token, save_format)
-        for word in self.corpus():
+        for word in self.corpus:
             tokenization = self.pre_tokenizer(word)
             if tokenization is not None:
                 self.splits[word] = tokenization
+        self.corpus = list(self.splits.keys())
 
     def init_vocab(self, token_path):
         with open(token_path, "r") as f:
@@ -93,10 +98,12 @@ class BPETrainer(TokenizerTrainer):
                 continue
             for i in range(len(split) - 1):
                 pair = (split[i], split[i + 1])
-                self.pair_freqs[pair] += 1
+            self.pair_freqs[pair] += 1
 
     def train(self):
         self.compute_pair_freqs()
+        print(f"Starting Vocab-size: {len(self.vocab)}")
+        print("Corpus-size: ", len(self.corpus))
         while len(self.vocab) < self.vocab_size:
             print(f"\rVocab-size: {len(self.vocab)} / {self.vocab_size}", end="")
             best_pair, max_freq = "", None
@@ -108,7 +115,7 @@ class BPETrainer(TokenizerTrainer):
             self.merges[best_pair] = merge_token
             self.vocab.append(merge_token)
             if len(self.vocab) in self.vocab_steps:
-                self.save(f"{self.save_format.format(len(self.vocab))}.pkl")
+                self.save(self.save_format.format(len(self.vocab)))
 
 
 class WordpieceTrainer(TokenizerTrainer):
@@ -123,11 +130,10 @@ class WordpieceTrainer(TokenizerTrainer):
     ):
         super(WordpieceTrainer, self).__init__(pre_tokenizer, corpus_path, token_path, total_token, add_token, save_format)
         for word in self.corpus:
-            # print(word)
             tokenization = self.pre_tokenizer(word)
-            # print(tokenization)
             if tokenization is not None:
-                self.splits[word] = [t if i == 0 else "##" + t for i, t in enumerate(self.pre_tokenizer(word))]
+                self.splits[word] = [t if i == 0 else "##" + t for i, t in enumerate(tokenization)]
+        self.corpus = list(self.splits.keys())
 
         self.single_freqs = defaultdict(int)
 
@@ -153,6 +159,8 @@ class WordpieceTrainer(TokenizerTrainer):
 
     def train(self):
         self.compute_pair_scores()
+        print(f"Starting Vocab-size: {len(self.vocab)}")
+        print("Corpus-size: ", len(self.corpus))
         while len(self.vocab) < self.vocab_size:
             print(f"\rVocab-size: {len(self.vocab)} / {self.vocab_size}", end="")
             scores = {
@@ -171,4 +179,4 @@ class WordpieceTrainer(TokenizerTrainer):
             self.single_freqs[merge_token] = freq
             self.vocab.append(merge_token)
             if len(self.vocab) in self.vocab_steps:
-                self.save(f"{self.save_format.format(len(self.vocab))}.pkl")
+                self.save(self.save_format.format(len(self.vocab)))

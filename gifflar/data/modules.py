@@ -62,7 +62,10 @@ class GlycanDataModule(LightningDataModule):
         Returns:
             DataLoader for the combined data
         """
-        predict = ConcatDataset([self.train, self.val, self.test])
+        if hasattr(self, "test"):
+            predict = ConcatDataset([self.train, self.val, self.test])
+        else:
+            predict = ConcatDataset([self.train, self.val])
         return DataLoader(predict, batch_size=1, shuffle=False,
                           collate_fn=hetero_collate, num_workers=self.num_workers)
 
@@ -79,6 +82,7 @@ class PretrainGDM(GlycanDataModule):
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
             num_workers: int = 0,
+            force_reload: bool = False,
             **kwargs: Any,
     ):
         """
@@ -97,7 +101,7 @@ class PretrainGDM(GlycanDataModule):
         root = Path(file_path).parent
         super().__init__(batch_size, num_workers=num_workers)
         ds = PretrainGDs(root=root, filename=file_path, hash_code=hash_code, transform=transform,
-                         pre_transform=pre_transform, **kwargs)
+                         pre_transform=pre_transform, force_reload=force_reload, **kwargs)
         self.train, self.val = torch.utils.data.dataset.random_split(ds, [train_frac, 1 - train_frac])
 
 

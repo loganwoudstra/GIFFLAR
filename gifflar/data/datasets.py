@@ -35,6 +35,7 @@ class GlycanOnDiskDataset(OnDiskDataset):
         self._db: Optional[Database] = None
         self._numel: Optional[int] = None
         super(OnDiskDataset, self).__init__(root, transform, pre_transform, pre_filter, log=log, force_reload=force_reload)
+        self.dataset_args = torch.load(Path(self.processed_paths[path_idx]).with_suffix(".pth"))
 
     def _process(self):
         if self.force_reload:
@@ -80,6 +81,7 @@ class GlycanOnDiskDataset(OnDiskDataset):
         if len(data) != 0:
             db.multi_insert(range(len(data)), data, batch_size=None)
         db.close()
+        torch.save(self.dataset_args, Path(self.processed_paths[path_idx]).with_suffix(".pth"))
 
 
 class GlycanInMemoryDataset(InMemoryDataset):
@@ -183,7 +185,7 @@ class PretrainGDs(GlycanDataset):
             **dataset_args: Additional arguments to pass to the dataset
         """
         super().__init__(root=root, filename=filename, hash_code=hash_code, transform=transform,
-                         pre_transform=pre_transform, dataset_args=dataset_args, **kwargs)
+                         pre_transform=pre_transform, force_reload=force_reload, **dataset_args)
 
     @property
     def processed_file_names(self) -> Union[str, list[str], tuple[str, ...]]:

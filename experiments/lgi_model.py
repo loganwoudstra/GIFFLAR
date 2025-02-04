@@ -1,54 +1,15 @@
 from pathlib import Path
 from typing import Any, Literal
-import copy
 
 import torch
 from pytorch_lightning import LightningModule
 from torch_geometric.data import HeteroData
 
 from experiments.protein_encoding import ENCODER_MAP, EMBED_SIZES
-from gifflar.data.utils import GlycanStorage
 from gifflar.data.hetero import HeteroDataBatch
 from gifflar.model.base import GlycanGIN
 from gifflar.model.baselines.sweetnet import SweetNetLightning
-from gifflar.model.utils import GIFFLARPooling, get_prediction_head
-
-
-class LectinStorage(GlycanStorage):
-    def __init__(self, lectin_encoder: str, le_layer_num: int, path: str | None = None):
-        """
-        Initialize the wrapper around a dict.
-
-        Args:
-            path: Path to the directory. If there's a lectin_storage.pkl, it will be used to fill this object,
-                otherwise, such file will be created.
-        """
-        self.path = Path(path or "data") / f"{lectin_encoder}_{le_layer_num}.pkl"
-        # print("Path:", self.path.resolve())
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        
-        self.encoder = ENCODER_MAP[lectin_encoder](le_layer_num)
-        self.data = self._load()
-
-    def query(self, aa_seq: str) -> torch.Tensor:
-        if aa_seq not in self.data:
-            try:
-                self.data[aa_seq] = self.encoder(aa_seq)
-            except Exception as e:
-                print(e)
-                self.data[aa_seq] = None
-
-        return self.data[aa_seq]
-
-    def batch_query(self, aa_seqs) -> torch.Tensor:
-        # print([self.query(aa_seq) for aa_seq in aa_seqs])
-        results = [self.query(aa_seq) for aa_seq in aa_seqs]
-        dummy = None
-        for x in results:
-            if x is not None:
-                dummy = torch.zeros_like(x)
-                break
-        return torch.stack([dummy if res is None else res for res in results])
+from gifflar.model.utils import GIFFLARPooling, LectinStorage, get_prediction_head
 
 
 class LGI_Model(LightningModule):
@@ -75,7 +36,7 @@ class LGI_Model(LightningModule):
         self.lectin_encoder = lectin_encoder
         self.le_layer_num = le_layer_num
 
-        self.lectin_embeddings = LectinStorage(lectin_encoder, le_layer_num, kwargs["root_dir"])
+        self.lectin_embeddings = LectinStorage(ENCODER_MAP[lectin_encoder](le_layer_num), kwargs["root_dir"])
         self.combined_dim = glycan_encoder.hidden_dim + EMBED_SIZES[lectin_encoder]
 
         self.head, self.loss, self.metrics = get_prediction_head(self.combined_dim, 1, "regression", size="large")

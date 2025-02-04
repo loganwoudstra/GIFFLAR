@@ -1,0 +1,15 @@
+seed: 42
+root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data
+logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs
+datasets:
+  - name: Immunogenicity
+    task: classification
+model:
+  - name: glylm
+    token_file: /home/rjo21/Desktop/GIFFLAR/GlyLM/bpe_glyles_2500.pkl
+    model_dir: /home/rjo21/Desktop/GIFFLAR/GlyLM/bpe_glyles_2500_model/checkpoint-last
+    hidden_dim: 320
+    epochs: 10
+    learning_rate: 0.001
+    optimizer: Adam
+    suffix: _glylm_test
