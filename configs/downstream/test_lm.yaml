@@ -6,7 +6,7 @@ datasets:
     task: classification
 model:
   - name: glylm
-    token_file: /home/rjo21/Desktop/GIFFLAR/GlyLM/bpe_glyles_2500.pkl
+    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_glyles_2500.pkl
     model_dir: /home/rjo21/Desktop/GIFFLAR/GlyLM/bpe_glyles_2500_model/checkpoint-last
     hidden_dim: 320
     epochs: 10

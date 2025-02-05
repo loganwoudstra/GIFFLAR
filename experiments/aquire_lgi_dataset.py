@@ -30,7 +30,7 @@ def classical_data():
         pickle.dump((data, lectins, glycans), f)
 
 
-def contrastive_data(decoy_threshold: float = 0, max_num_decoys: int = 5):
+def contrastive_data(decoy_threshold: float = 0, max_num_decoys: int = 2):
     DECOY = 0
     LIGAND = 1
 
@@ -56,7 +56,7 @@ def contrastive_data(decoy_threshold: float = 0, max_num_decoys: int = 5):
                 splits = np.random.choice(["train", "val", "test"], 1, p=[0.7, 0.2, 0.1])
                 triplets.append((aa_seq, ligand, zRFU, decoy, mols[DECOY][decoy], str(splits[0])))
 
-    with open("contrastive_data.pkl", "wb") as f:
+    with open("/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/contrastive_data_2.pkl", "wb") as f:
         pickle.dump(triplets, f)
 
 

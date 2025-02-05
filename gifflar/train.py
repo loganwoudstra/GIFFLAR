@@ -13,7 +13,7 @@ from pytorch_lightning.callbacks import RichProgressBar, RichModelSummary, Model
 from pytorch_lightning.loggers import CSVLogger, Logger
 from torch_geometric import seed_everything
 
-from gifflar.data.modules import DownsteamGDM, PretrainGDM
+from gifflar.data.modules import DownstreamGDM, PretrainGDM
 from gifflar.model.baselines.gnngly import GNNGLY
 from gifflar.model.baselines.mlp import MLP
 from gifflar.model.baselines.rgcn import RGCN
@@ -38,7 +38,7 @@ MODELS = {
 }
 
 
-def setup(count: int = 4, **kwargs: Any) -> tuple[dict, DownsteamGDM, Logger | None, dict | None]:
+def setup(count: int = 4, **kwargs: Any) -> tuple[dict, DownstreamGDM, Logger | None, dict | None]:
     """
     Set up the training environment.
 
@@ -56,7 +56,7 @@ def setup(count: int = 4, **kwargs: Any) -> tuple[dict, DownsteamGDM, Logger | N
 
     # set up the data module
     data_config = get_dataset(kwargs["dataset"], kwargs["root_dir"])
-    datamodule = DownsteamGDM(
+    datamodule = DownstreamGDM(
         root=kwargs["root_dir"], filename=data_config["filepath"], hash_code=kwargs["hash"],
         batch_size=kwargs["model"].get("batch_size", 1), transform=None,
         pre_transform=get_pretransforms(data_config["name"], **(kwargs.get("pre-transforms", None) or {})), **data_config,

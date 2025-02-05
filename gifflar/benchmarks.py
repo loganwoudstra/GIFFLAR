@@ -81,9 +81,9 @@ def get_tissue(root: Path | str) -> Path:
     Returns:
         The filepath of the processed tissue data.
     """
-    if not (p := (root / Path("immunogenicity.tsv"))).exists():
+    if not (p := (root / Path("tissue.tsv"))).exists():
         # Process the data and remove unnecessary columns
-        df = pd.read_csv("tissue_multilabel_df.csv")
+        df = pd.read_csv("datasets/tissue_multilabel_df.csv")
         df.rename(columns={"glycan": "IUPAC"}, inplace=True)
         df.dropna(inplace=True)
 

@@ -1,0 +1,15 @@
+seed: 42
+root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/
+corpus_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/glycoverse_2371k.txt
+max_length: 200
+tokenizations:
+  - name: BPE_GlyLES_2500_t6
+    pretokenizer: glyles  # 'glyles' or 'lib'
+    tokenizer: bpe  # 'bpe' or 'wp'
+    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_glyles_2500.pkl
+model:
+  epochs: 20
+  batch_size: 1024
+  num_layers: 6
+  hidden_size: 320
+  num_heads: 20

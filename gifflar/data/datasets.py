@@ -248,7 +248,8 @@ class DownstreamGDs(GlycanDataset):
             The features, the labels, and the one-hot encoded labels
         """
         X, y, y_oh = [], [], []
-        for d in self.data:
+        data_container = self.data if hasattr(self, "data") else self
+        for d in data_container:
             X.append(d["fp"])
             y.append(d["y"])
             if hasattr(d, "y_oh"):

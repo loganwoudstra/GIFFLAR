@@ -67,7 +67,9 @@ class GIFFLARTokenizer(PreTrainedTokenizerFast):
 
     def bpe_tokenize(self, text):
         splits = self.pre_tokenizer_(text)
-        for pair, merge in self.merges.items():
+        if splits is None:
+            return [self.unk_token]
+        for pair, merge in self.merges_.items():
             i = 0
             while i < len(splits) - 1:
                 if splits[i] == pair[0] and splits[i + 1] == pair[1]:
@@ -96,8 +98,9 @@ class GIFFLARTokenizer(PreTrainedTokenizerFast):
 
     def load(self, path):
         with open(path, "rb") as f:
-            base_vocab, self.merges = pickle.load(f)
+            base_vocab, self.merges_ = pickle.load(f)
         self.vocab_.update({v: i + self.eos_token_id for i, v in enumerate(base_vocab)})
+        return self
 
     def __call__(self, text, *args, **kwargs):
         tokens = self.bpe_tokenize(text) if self.mode == "BPE" else self.wordpiece_tokenize(text)

@@ -57,7 +57,7 @@ def determine_concat_dim(tensors):
     return concat_dim
 
 
-def hetero_collate(data: Optional[Union[list[list[HeteroData]], list[HeteroData]]]) -> HeteroDataBatch:
+def hetero_collate(obj: object, data: Optional[Union[list[list[HeteroData]], list[HeteroData]]], *args, **kwargs) -> HeteroDataBatch:
     """
     Collate a list of HeteroData objects to a batch thereof.
 
@@ -179,6 +179,6 @@ def hetero_collate(data: Optional[Union[list[list[HeteroData]], list[HeteroData]
                            num_nodes=num_nodes, batch_dict=batch_dict, **kwargs)
 
 
-def hetero_tuple_collate(data: list[tuple[HeteroData, HeteroData]], *args, **kwargs: Any) -> tuple[HeteroDataBatch, HeteroDataBatch]:
+def hetero_tuple_collate(obj: object, data: list[tuple[HeteroData, HeteroData]], *args, **kwargs: Any) -> tuple[HeteroDataBatch, HeteroDataBatch]:
     data, decoys = tuple(list(*zip(data)))
     return hetero_collate(data), hetero_collate(decoys)
