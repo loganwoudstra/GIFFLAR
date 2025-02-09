@@ -508,7 +508,7 @@ class TQDMCompose(Compose):
                     if isinstance(d, (Data, HeteroData)):
                         output.append(transform(d))
                     elif isinstance(d, (list, tuple)):
-                        output.append([transform(dd) for dd in d])
+                        output.append(tuple(transform(dd) for dd in d))
         return output
 
 

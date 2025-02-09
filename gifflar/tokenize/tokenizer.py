@@ -100,9 +100,11 @@ class GIFFLARTokenizer(PreTrainedTokenizerFast):
         with open(path, "rb") as f:
             base_vocab, self.merges_ = pickle.load(f)
         self.vocab_.update({v: i + self.eos_token_id for i, v in enumerate(base_vocab)})
+        print(len(self.vocab_), len(self.merges_))
         return self
 
     def __call__(self, text, *args, **kwargs):
+        print(len(self.vocab_))
         tokens = self.bpe_tokenize(text) if self.mode == "BPE" else self.wordpiece_tokenize(text)
         input_ids = []
         token_type_ids = []

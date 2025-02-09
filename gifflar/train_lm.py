@@ -22,8 +22,7 @@ from gifflar.utils import read_yaml_config
 def train(**kwargs):
     pretokenizer = GrammarPreTokenizer() if kwargs["tokenization"]["pretokenizer"] == "glyles" else GlycoworkPreTokenizer()
     tokenizer = GIFFLARTokenizer(pretokenizer, kwargs["tokenization"]["tokenizer"].upper()).load(kwargs["tokenization"]["token_file"])
-    
-    
+        
     def tokenize_function(entries: dict) -> Encoding:
         return tokenizer(entries["text"], padding="max_length", truncation=True, max_length=kwargs["max_length"])
 

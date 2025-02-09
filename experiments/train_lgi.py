@@ -1,7 +1,7 @@
 import os
 
 from experiments.contrastive_model import ContrastLGIModel
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 from argparse import ArgumentParser
 import time

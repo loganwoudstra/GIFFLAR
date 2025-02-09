@@ -46,7 +46,9 @@ def contrastive_data(decoy_threshold: float = 0, max_num_decoys: int = 2):
         data[aa_seq][index][iupac] = val
 
     triplets = []
-    for aa_seq, mols in tqdm(data.items()):
+    for i, (aa_seq, mols) in tqdm(enumerate(data.items())):
+        if i > 100:
+            break
         if len(mols[DECOY]) == 0 or len(mols[LIGAND]) == 0:
             continue
         for ligand, zRFU in mols[LIGAND].items():
@@ -56,7 +58,7 @@ def contrastive_data(decoy_threshold: float = 0, max_num_decoys: int = 2):
                 splits = np.random.choice(["train", "val", "test"], 1, p=[0.7, 0.2, 0.1])
                 triplets.append((aa_seq, ligand, zRFU, decoy, mols[DECOY][decoy], str(splits[0])))
 
-    with open("/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/contrastive_data_2.pkl", "wb") as f:
+    with open("/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/contrastive_data_mini.pkl", "wb") as f:
         pickle.dump(triplets, f)
 
 

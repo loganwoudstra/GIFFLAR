@@ -68,7 +68,7 @@ class ContrastLGIModel(LGI_Model):
             "lectin": lectin_small,
         }
         if decoys is not None:
-            decoy_embed = self.glycan_encoder(decoys)
+            decoy_embed = self.glycan_encoder(decoys)["graph_embed"]
             decoy_small = self.glycan_red(decoy_embed)
             fwd_dict["decoy"] = decoy_small
 
@@ -78,7 +78,7 @@ class ContrastLGIModel(LGI_Model):
         fwd_dict = self.forward(batch, decoys)
         fwd_dict["labels"] = batch["y"]
 
-        inter_pred = self.sigmoid_cosine_distance_p(fwd_dict["glycan"], fwd_dict["lectin"])
+        inter_pred = sigmoid_cosine_distance_p(fwd_dict["glycan"], fwd_dict["lectin"])
         fwd_dict["preds"] = inter_pred
 
         inter_loss = self.pred_loss(inter_pred, fwd_dict["labels"])

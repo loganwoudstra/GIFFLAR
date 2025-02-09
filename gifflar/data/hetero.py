@@ -180,5 +180,5 @@ def hetero_collate(obj: object, data: Optional[Union[list[list[HeteroData]], lis
 
 
 def hetero_tuple_collate(obj: object, data: list[tuple[HeteroData, HeteroData]], *args, **kwargs: Any) -> tuple[HeteroDataBatch, HeteroDataBatch]:
-    data, decoys = tuple(list(*zip(data)))
-    return hetero_collate(data), hetero_collate(decoys)
+    data, decoys = tuple(map(list, zip(*data)))
+    return hetero_collate(obj, data), hetero_collate(obj, decoys)

@@ -36,7 +36,12 @@ class LGI_Model(LightningModule):
         self.lectin_encoder = lectin_encoder
         self.le_layer_num = le_layer_num
 
-        self.lectin_embeddings = LectinStorage(ENCODER_MAP[lectin_encoder](le_layer_num), kwargs["root_dir"])
+        self.lectin_embeddings = LectinStorage(
+            encoder=ENCODER_MAP[lectin_encoder](le_layer_num), 
+            lectin_encoder=lectin_encoder, 
+            le_layer_num=le_layer_num, 
+            path=kwargs["root_dir"]
+        )
         self.combined_dim = glycan_encoder.hidden_dim + EMBED_SIZES[lectin_encoder]
 
         self.head, self.loss, self.metrics = get_prediction_head(self.combined_dim, 1, "regression", size="large")

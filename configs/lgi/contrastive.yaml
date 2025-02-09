@@ -4,7 +4,7 @@ seed: 42
 #origin: /home/daniel/Desktop/GIFFLAR/contrastive_data.pkl
 root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/lgi_data
 logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/lgi_logs
-origin: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/contrastive_data_2.pkl
+origin: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/contrastive_data_mini.pkl
 model:
   glycan_encoder:
     name: gifflar
@@ -15,7 +15,7 @@ model:
   lectin_encoder:
     name: ESM
     layer_num: 33
-  batch_size: 256
+  batch_size: 128
   epochs: 100
   learning_rate: 0.001
   optimizer: Adam

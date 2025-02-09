@@ -161,7 +161,7 @@ class GlycanStorage:
         if iupac not in self.data:
             try:
                 self.data[iupac] = iupac2mol(iupac)
-            except:
+            except Exception as e:
                 self.data[iupac] = None
         return copy.deepcopy(self.data[iupac])
 

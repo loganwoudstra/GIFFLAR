@@ -9,7 +9,7 @@ tokenizations:
     token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_glyles_2500.pkl
 model:
   epochs: 20
-  batch_size: 1024
+  batch_size: 256
   num_layers: 6
   hidden_size: 320
   num_heads: 20

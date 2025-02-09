@@ -72,6 +72,9 @@ class GlycanOnDiskDataset(OnDiskDataset):
     def __getitem__(self, idx: int):
         return self.get(idx)
 
+    def __getitems__(self, indices):
+        return [self.get(idx) for idx in indices]
+
     def process_(self, data: list[HeteroData], path_idx: int):
         """
 
@@ -81,6 +84,20 @@ class GlycanOnDiskDataset(OnDiskDataset):
             db.multi_insert(range(len(data)), data, batch_size=None)
         db.close()
         torch.save(self.dataset_args, Path(self.processed_paths[path_idx]).with_suffix(".pth"))
+    
+    def serialize(self, data: BaseData) -> Any:
+        r"""Serializes the :class:`~torch_geometric.data.Data` or
+        :class:`~torch_geometric.data.HeteroData` object into the expected DB
+        schema.
+        """
+        return data
+
+    def deserialize(self, data: Any) -> BaseData:
+        r"""Deserializes the DB entry into a
+        :class:`~torch_geometric.data.Data` or
+        :class:`~torch_geometric.data.HeteroData` object.
+        """
+        return data
 
 
 class GlycanInMemoryDataset(InMemoryDataset):
@@ -117,6 +134,7 @@ class GlycanDataset(GlycanOnDiskDataset):
             root: str | Path,
             filename: str | Path,
             hash_code: str,
+            schema: Schema = object,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
             path_idx: int = 0,
@@ -137,7 +155,8 @@ class GlycanDataset(GlycanOnDiskDataset):
         """
         self.filename = Path(filename)
         self.dataset_args = dataset_args
-        super().__init__(root=str(Path(root) / f"{self.filename.stem}_{hash_code}"), transform=transform, pre_transform=pre_transform, path_idx=path_idx, force_reload=force_reload)
+        super().__init__(root=str(Path(root) / f"{self.filename.stem}_{hash_code}"), schema=schema,
+                         transform=transform, pre_transform=pre_transform, path_idx=path_idx, force_reload=force_reload)
 
     @property
     def processed_paths(self) -> list[str]:
@@ -166,6 +185,7 @@ class PretrainGDs(GlycanDataset):
             root: str | Path,
             filename: str | Path,
             hash_code: str,
+            schema: Schema = object,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
             force_reload: bool = False,
@@ -182,7 +202,7 @@ class PretrainGDs(GlycanDataset):
             pre_transform: The pre-transform to apply to the data
             **dataset_args: Additional arguments to pass to the dataset
         """
-        super().__init__(root=root, filename=filename, hash_code=hash_code, transform=transform,
+        super().__init__(root=root, filename=filename, hash_code=hash_code, schema=schema, transform=transform,
                          pre_transform=pre_transform, force_reload=force_reload, **dataset_args)
 
     @property
@@ -215,6 +235,7 @@ class DownstreamGDs(GlycanDataset):
             filename: str | Path,
             split: str,
             hash_code: str,
+            schema: Schema = object,
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
             force_reload: bool = False,
@@ -232,7 +253,7 @@ class DownstreamGDs(GlycanDataset):
             pre_transform: The pre-transform to apply to the data
             **dataset_args: Additional arguments to pass to the dataset
         """
-        super().__init__(root=root, filename=filename, hash_code=hash_code, transform=transform,
+        super().__init__(root=root, filename=filename, hash_code=hash_code, schema=schema, transform=transform,
                          pre_transform=pre_transform, path_idx=self.splits[split], force_reload=force_reload, **dataset_args)
 
     @property
@@ -299,6 +320,32 @@ class DownstreamGDs(GlycanDataset):
 
 
 class LGIDataset(DownstreamGDs):
+    def __init__(
+            self,
+            root: str | Path,
+            filename: str | Path,
+            split: str,
+            hash_code: str,
+            transform: Optional[Callable] = None,
+            pre_transform: Optional[Callable] = None,
+            force_reload: bool = False,
+            **dataset_args: dict[str, Any],
+    ):
+        """
+        Initialize the dataset for downstream tasks with the given parameters.
+
+        Args:
+            root: The root directory to store the processed data
+            filename: The filename of the data to process
+            split: The split to use, e.g., train, val, test
+            hash_code: The hash code to use for the processed data
+            transform: The transform to apply to the data
+            pre_transform: The pre-transform to apply to the data
+            **dataset_args: Additional arguments to pass to the dataset
+        """
+        super().__init__(root=root, filename=filename, split=split, hash_code=hash_code, schema=(object, object), transform=transform,
+                         pre_transform=pre_transform, force_reload=force_reload, **dataset_args)
+    
     def process(self) -> None:
         """Process the data and store it."""
         if str(self.filename).endswith(".pkl"):
@@ -347,7 +394,16 @@ class LGIDataset(DownstreamGDs):
             print("Post-process", split)
             self.process_(data[split], path_idx=self.splits[split])
 
+
 class ContrastiveLGIDataset(LGIDataset):
+    def _inter_process(self, data: list[HeteroData], path_idx: int) -> None:
+        db = self.get_db(path_idx)
+        if len(data) != 0:
+            self.db.multi_insert(range(len(data)), data, batch_size=None)
+        db.close()
+        torch.save(self.dataset_args, Path(self.processed_paths[path_idx]).with_suffix(".pth"))
+
+
     def process_pkl(self) -> None:
         data = {k: [] for k in self.splits}
         with open(self.filename, "rb") as f:

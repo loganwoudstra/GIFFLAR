@@ -21,7 +21,7 @@ def train_tokenizer(name_trainer, name_pre_tokenizer):
 
 def train_all():
     for name_trainer in ["wordpiece", "bpe"]:
-        for name_pre_tokenizer in ["glyles", "lib"]:
+        for name_pre_tokenizer in ["lib"]:  # ["glyles", "lib"]:
             train_tokenizer(name_trainer, name_pre_tokenizer)
 
 
