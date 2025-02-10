@@ -30,7 +30,7 @@ def classical_data():
         pickle.dump((data, lectins, glycans), f)
 
 
-def contrastive_data(decoy_threshold: float = 0, max_num_decoys: int = 2):
+def contrastive_data(decoy_threshold: float = 0, max_num_decoys: int = 4, norm_percentile: float = 90):
     DECOY = 0
     LIGAND = 1
 
@@ -47,8 +47,6 @@ def contrastive_data(decoy_threshold: float = 0, max_num_decoys: int = 2):
 
     triplets = []
     for i, (aa_seq, mols) in tqdm(enumerate(data.items())):
-        if i > 100:
-            break
         if len(mols[DECOY]) == 0 or len(mols[LIGAND]) == 0:
             continue
         for ligand, zRFU in mols[LIGAND].items():
@@ -56,9 +54,14 @@ def contrastive_data(decoy_threshold: float = 0, max_num_decoys: int = 2):
             random.shuffle(decoys)
             for decoy in decoys[:max_num_decoys]:
                 splits = np.random.choice(["train", "val", "test"], 1, p=[0.7, 0.2, 0.1])
-                triplets.append((aa_seq, ligand, zRFU, decoy, mols[DECOY][decoy], str(splits[0])))
+                triplets.append([aa_seq, ligand, zRFU, decoy, mols[DECOY][decoy], str(splits[0])])
+    
+    # Normalize the zRFU values to [0,1]
+    scale_factor = np.percentile([t[2] for t in triplets], norm_percentile) - decoy_threshold
+    for t in triplets:
+        t[2] = min((t[2] - decoy_threshold) / scale_factor, 1)
 
-    with open("/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/contrastive_data_mini.pkl", "wb") as f:
+    with open("/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/contrastive_data.pkl", "wb") as f:
         pickle.dump(triplets, f)
 
 
