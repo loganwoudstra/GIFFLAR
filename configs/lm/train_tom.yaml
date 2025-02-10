@@ -10,7 +10,7 @@ tokenizations:
   - name: BPE_Lib_5000_t6
     pretokenizer: lib
     tokenizer: bpe
-    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_5500.pkl
+    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_5000.pkl
   - name: BPE_Lib_7500_t6
     pretokenizer: lib
     tokenizer: bpe
@@ -21,16 +21,16 @@ tokenizations:
     token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_10000.pkl
   - name: WP_Lib_5000_t6
     pretokenizer: lib
-    tokenizer: bpe
-    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_5500.pkl
+    tokenizer: wp
+    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/wordpiece_lib_5000.pkl
   - name: WP_Lib_7500_t6
     pretokenizer: lib
-    tokenizer: bpe
-    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_7500.pkl
+    tokenizer: wp
+    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/wordpiece_lib_7500.pkl
   - name: WP_Lib_10000_t6
     pretokenizer: lib
-    tokenizer: bpe
-    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_10000.pkl
+    tokenizer: wp
+    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/wordpiece_lib_10000.pkl
 model:
   epochs: 20
   batch_size: 256

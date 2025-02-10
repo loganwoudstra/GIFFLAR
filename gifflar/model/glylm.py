@@ -41,8 +41,8 @@ class GlycanLM(DownstreamGGIN):
         Returns:
             Dict holding the node embeddings (None for the MLP), the graph embedding, and the final model prediction
         """
-        token_embeddings = torch.cat([self.encoder(iupac) for iupac in batch["IUPAC"]], dim=0).to(self.device)
-        graph_embeddings = torch.mean(token_embeddings, dim=1)
+        with torch.no_grad():
+            graph_embeddings = torch.cat([self.encoder(iupac).mean(dim=1) for iupac in batch["IUPAC"]], dim=0).to(self.device)
         return {
             "node_embed": None,
             "graph_embed": graph_embeddings,

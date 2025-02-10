@@ -4,10 +4,10 @@ seed: 42
 root_dir: /home/daniel/Data1/roman/GIFFLAR/data
 logs_dir: /home/daniel/Data1/roman/GIFFLAR/logs
 datasets:
-  #- name: Immunogenicity
-  #  task: classification
-  #- name: Glycosylation
-  #  task: classification
+  - name: Immunogenicity
+    task: classification
+  - name: Glycosylation
+    task: classification
   - name: Tissue
     task: multilabel
   - name: Taxonomy_Domain

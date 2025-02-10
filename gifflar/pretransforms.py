@@ -499,6 +499,8 @@ class TQDMCompose(Compose):
         Returns:
             The transformed data
         """
+        if len(data) == 0 or len(self.transforms) == 0:
+            return data
         for transform in tqdm(self.transforms, desc=f"TQDM Transform"):
             if not isinstance(data, (list, tuple)):
                 output = transform(data)
@@ -509,6 +511,8 @@ class TQDMCompose(Compose):
                         output.append(transform(d))
                     elif isinstance(d, (list, tuple)):
                         output.append(tuple(transform(dd) for dd in d))
+                    else:
+                        raise ValueError(f"Unsupported data type: {type(d)}")
         return output
 
 

@@ -78,8 +78,8 @@ class GlycanOnDiskDataset(OnDiskDataset):
         """
 
         """
-        print("Processing", len(data), "entries")
         if len(data) != 0:
+            print("Processing", len(data), "entries")
             self.db.multi_insert(range(self._numel, self._numel + len(data)), data, batch_size=None)
             self._numel += len(data)
         if final:
@@ -190,13 +190,13 @@ class PretrainGDs(GlycanDataset):
         gs = GlycanStorage(Path(self.root).parent)
         with open(self.filename, "r") as glycans:
             for i, line in enumerate(glycans.readlines()):
-                d = gs.query(line.strip())
-                d["ID"] = i
-                data.append(d)
                 if i % 1000 == 0:
                     self.process_(data, final=False)
                     del data
                     data = []
+                d = gs.query(line.strip())
+                d["ID"] = i
+                data.append(d)
         gs.close()
         self.process_(data, final=True)
 
@@ -278,7 +278,11 @@ class DownstreamGDs(GlycanDataset):
         gs = GlycanStorage(Path(self.root).parent)
         data = []
         for i, (_, row) in tqdm(enumerate(df.iterrows())):
-            if row["split"] != self.splits[self.split]:
+            if i % 1000 == 0:
+                self.process_(data, path_idx=self.splits[self.split], final=False)
+                del data
+                data = []
+            if row["split"] != self.split:
                 continue
             d = gs.query(row["IUPAC"])
             if d is None:
@@ -291,10 +295,6 @@ class DownstreamGDs(GlycanDataset):
                     d["y"] = d["y_oh"].argmax().item()
             d["ID"] = i
             data.append(d)
-            if i % 1000 == 0:
-                self.process_(data, path_idx=self.splits[self.split], final=False)
-                del data
-                data = []
 
         gs.close()
         self.process_(data, path_idx=self.splits[self.split], final=True)
@@ -342,6 +342,10 @@ class LGIDataset(DownstreamGDs):
         gs = GlycanStorage(Path(self.root).parent)
         data = []
         for i, (lectin_id, glycan_id, value, split) in tqdm(enumerate(inter)):
+            if i % 1000 == 0:
+                self.process_(data, path_idx=self.splits[split], final=False)
+                del data
+                data = []
             if split != self.split:
                 continue
             d = gs.query(glycan_map[glycan_id])
@@ -351,10 +355,6 @@ class LGIDataset(DownstreamGDs):
             d["y"] = torch.tensor([value])
             d["ID"] = i
             data[split].append(d)
-            if i % 1000 == 0:
-                self.process_(data, path_idx=self.splits[split], final=False)
-                del data
-                data = []
 
         gs.close()
         self.process_(data, path_idx=self.splits[split], final=True)
@@ -364,8 +364,12 @@ class LGIDataset(DownstreamGDs):
         gs = GlycanStorage(Path(self.root).parent)
         data = []
         for i, (_, row) in tqdm(enumerate(inter.iterrows())):
+            if i % 1000 == 0:
+                self.process_(data, path_idx=self.splits[split], final=False)
+                del data
+                data = []
             split = getattr(row, "split", "train")
-            if split != self.splits:
+            if split != self.split:
                 continue
             d = gs.query(row["IUPAC"])
             if d is None:
@@ -374,10 +378,6 @@ class LGIDataset(DownstreamGDs):
             d["y"] = torch.tensor([getattr(row, "y", 0)])
             d["ID"] = i
             data.append(d)
-            if i % 1000 == 0:
-                self.process_(data, path_idx=self.splits[split], final=False)
-                del data
-                data = []
         
         gs.close()
         self.process_(data, path_idx=self.splits[split], final=True)
@@ -400,6 +400,10 @@ class ContrastiveLGIDataset(LGIDataset):
         gs = GlycanStorage(Path(self.root).parent)
         data = []
         for i, (lectin, glycan, glycan_val, decoy, decoy_val, split) in tqdm(enumerate(lgis)):
+            if i % 1000 == 0:
+                self.process_(data, path_idx=self.splits[split], final=False)
+                del data
+                data = []
             if split != self.split:
                 continue
             try:
@@ -418,10 +422,6 @@ class ContrastiveLGIDataset(LGIDataset):
             except Exception as e:
                 print(e)
                 continue
-            if i % 1000 == 0:
-                self.process_(data, path_idx=self.splits[split], final=False)
-                del data
-                data = []
 
         gs.close()
         self.process_(data, path_idx=self.splits[self.split], final=True)
@@ -431,8 +431,12 @@ class ContrastiveLGIDataset(LGIDataset):
         gs = GlycanStorage(Path(self.root).parent)
         data = []
         for i, (_, row) in tqdm(enumerate(inter.iterrows())):
+            if i % 1000 == 0:
+                self.process_(data, path_idx=self.splits[split], final=False)
+                del data
+                data = []
             split = getattr(row, "split", "train")
-            if split != self.splits:
+            if split != self.split:
                 continue
             d = gs.query(row["IUPAC"])
             if d is None:
@@ -442,10 +446,6 @@ class ContrastiveLGIDataset(LGIDataset):
             d["ID"] = i
             decoy = gs.query(getattr(row, "decoy", None))
             data.append((d, decoy))
-            if i % 1000 == 0:
-                self.process_(data, path_idx=self.splits[split], final=False)
-                del data
-                data = []
         
         gs.close()
         self.process_(data, path_idx=self.splits[split], final=True)

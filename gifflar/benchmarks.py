@@ -104,10 +104,7 @@ def get_immunogenicity(root: Path | str) -> Path:
     """
     if not (p := (root / Path("immunogenicity.tsv"))).exists():
         # Download the data
-        urllib.request.urlretrieve(
-            "https://torchglycan.s3.us-east-2.amazonaws.com/downstream/glycan_immunogenicity.csv",
-            root / "immunogenicity.csv"
-        )
+        urllib.request.urlretrieve("https://torchglycan.s3.us-east-2.amazonaws.com/downstream/glycan_immunogenicity.csv", p)
 
         # Process the data and remove unnecessary columns
         df = pd.read_csv("immunogenicity.csv")[["glycan", "immunogenicity"]]
@@ -138,10 +135,7 @@ def get_glycosylation(root: Path | str) -> Path:
         The filepath of the processed glycosylation data.
     """
     if not (p := root / Path("glycosylation.tsv")).exists():
-        urllib.request.urlretrieve(
-            "https://torchglycan.s3.us-east-2.amazonaws.com/downstream/glycan_properties.csv",
-            root / "glycosylation.csv"
-        )
+        urllib.request.urlretrieve("https://torchglycan.s3.us-east-2.amazonaws.com/downstream/glycan_properties.csv", p)
         df = pd.read_csv("glycosylation.csv")[["glycan", "link"]]
         df.rename(columns={"glycan": "IUPAC"}, inplace=True)
         df.dropna(inplace=True)

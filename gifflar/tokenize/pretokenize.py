@@ -148,13 +148,6 @@ class GrammarPreTokenizer(PreTokenizer):
         except Exception as e:
             with open("lm_logs.txt", "a") as f:
                 print(iupac, ":", e, file=f)
-            print(iupac, ":", e)
             return None
 
         return [t.text for t in token.tokens[1:-2]]
-        # self.io.seek(0)
-        # content = self.io.read()
-        # if len(content) == 0:
-        #     return [t.text for t in token.tokens[1:-2]]
-        # print(iupac, "->", content)
-        # return None
