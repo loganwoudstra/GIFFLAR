@@ -76,13 +76,13 @@ class ContrastLGIModel(LGI_Model):
 
     def shared_step(self, batch: HeteroDataBatch, decoys: HeteroDataBatch | None, stage: str) -> dict[str, torch.Tensor]:
         fwd_dict = self.forward(batch, decoys)
-        fwd_dict["labels"] = batch["y"]
+        fwd_dict["labels"] = batch["y"].float()
 
         inter_pred = sigmoid_cosine_distance_p(fwd_dict["glycan"], fwd_dict["lectin"])
         fwd_dict["preds"] = inter_pred
 
         inter_loss = self.pred_loss(inter_pred, fwd_dict["labels"])
-        fwd_dict["inter_loss"] = inter_loss
+        fwd_dict["inter_loss"] = inter_loss.float()
 
         if decoys is not None:
             embed_loss = self.embed_loss(fwd_dict["glycan"], fwd_dict["lectin"], fwd_dict["decoy"])
@@ -90,7 +90,7 @@ class ContrastLGIModel(LGI_Model):
             loss = inter_loss + embed_loss # weighting factor?
         else:
             loss = inter_loss
-        fwd_dict["loss"] = loss
+        fwd_dict["loss"] = loss.float()
 
         self.metrics[stage].update(inter_pred, fwd_dict["labels"])
         self.log(f"{stage}/loss", fwd_dict["loss"], batch_size=len(fwd_dict["preds"]))
