@@ -102,12 +102,13 @@ def get_immunogenicity(root: Path | str) -> Path:
     Returns:
         The filepath of the processed immunogenicity data.
     """
-    if not (p := (root / Path("immunogenicity.tsv"))).exists():
+    root = Path(root)
+    if not (p := (root / "immunogenicity.tsv")).exists():
         # Download the data
-        urllib.request.urlretrieve("https://torchglycan.s3.us-east-2.amazonaws.com/downstream/glycan_immunogenicity.csv", p)
+        urllib.request.urlretrieve("https://torchglycan.s3.us-east-2.amazonaws.com/downstream/glycan_immunogenicity.csv", p.with_suffix(".csv"))
 
         # Process the data and remove unnecessary columns
-        df = pd.read_csv("immunogenicity.csv")[["glycan", "immunogenicity"]]
+        df = pd.read_csv(p.with_suffix(".csv"))[["glycan", "immunogenicity"]]
         df.rename(columns={"glycan": "IUPAC"}, inplace=True)
         df.dropna(inplace=True)
 
@@ -118,7 +119,7 @@ def get_immunogenicity(root: Path | str) -> Path:
 
         df.drop("immunogenicity", axis=1, inplace=True)
         df.to_csv(p, sep="\t", index=False)
-        with open("immunogenicity_classes.tsv", "w") as f:
+        with open(root / "immunogenicity_classes.tsv", "w") as f:
             for n, i in classes.items():
                 print(n, i, sep="\t", file=f)
     return p
@@ -134,9 +135,10 @@ def get_glycosylation(root: Path | str) -> Path:
     Returns:
         The filepath of the processed glycosylation data.
     """
-    if not (p := root / Path("glycosylation.tsv")).exists():
-        urllib.request.urlretrieve("https://torchglycan.s3.us-east-2.amazonaws.com/downstream/glycan_properties.csv", p)
-        df = pd.read_csv("glycosylation.csv")[["glycan", "link"]]
+    root = Path(root)
+    if not (p := root / "glycosylation.tsv").exists():
+        urllib.request.urlretrieve("https://torchglycan.s3.us-east-2.amazonaws.com/downstream/glycan_properties.csv", p.with_suffix(".csv"))
+        df = pd.read_csv(p.with_suffix(".csv"))[["glycan", "link"]]
         df.rename(columns={"glycan": "IUPAC"}, inplace=True)
         df.dropna(inplace=True)
 
@@ -146,7 +148,7 @@ def get_glycosylation(root: Path | str) -> Path:
 
         df.drop("link", axis=1, inplace=True)
         df.to_csv(p, sep="\t", index=False)
-        with open("glycosylation_classes.tsv", "w") as f:
+        with open(root / "glycosylation_classes.tsv", "w") as f:
             for n, i in classes.items():
                 print(n, i, sep="\t", file=f)
     return p

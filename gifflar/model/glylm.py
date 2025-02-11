@@ -29,7 +29,7 @@ class GlycanLM(DownstreamGGIN):
         tokenizer.load(token_file)
         glycan_lm = EsmModel.from_pretrained(model_dir)
         self.encoder = lambda x: pipeline(tokenizer, glycan_lm, x)
-        self.head, self.loss, self.metrics = get_prediction_head(hidden_dim, 1, "regression")
+        self.head, self.loss, self.metrics = get_prediction_head(hidden_dim, self.output_dim, self.task)
 
     def forward(self, batch: HeteroDataBatch) -> dict[str, torch.Tensor]:
         """

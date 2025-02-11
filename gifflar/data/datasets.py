@@ -15,6 +15,8 @@ from tqdm import tqdm
 from gifflar.data.utils import GlycanStorage
 
 
+PROCESS_CHUNK_SIZE = 100_000
+
 class GlycanOnDiskDataset(OnDiskDataset):
     def __init__(
             self,
@@ -190,7 +192,7 @@ class PretrainGDs(GlycanDataset):
         gs = GlycanStorage(Path(self.root).parent)
         with open(self.filename, "r") as glycans:
             for i, line in enumerate(glycans.readlines()):
-                if i % 1000 == 0:
+                if i % PROCESS_CHUNK_SIZE == 0:
                     self.process_(data, final=False)
                     del data
                     data = []
@@ -278,7 +280,7 @@ class DownstreamGDs(GlycanDataset):
         gs = GlycanStorage(Path(self.root).parent)
         data = []
         for i, (_, row) in tqdm(enumerate(df.iterrows())):
-            if i % 1000 == 0:
+            if i % PROCESS_CHUNK_SIZE == 0:
                 self.process_(data, path_idx=self.splits[self.split], final=False)
                 del data
                 data = []
@@ -342,7 +344,7 @@ class LGIDataset(DownstreamGDs):
         gs = GlycanStorage(Path(self.root).parent)
         data = []
         for i, (lectin_id, glycan_id, value, split) in tqdm(enumerate(inter)):
-            if i % 1000 == 0:
+            if i % PROCESS_CHUNK_SIZE == 0:
                 self.process_(data, path_idx=self.splits[split], final=False)
                 del data
                 data = []
@@ -364,7 +366,7 @@ class LGIDataset(DownstreamGDs):
         gs = GlycanStorage(Path(self.root).parent)
         data = []
         for i, (_, row) in tqdm(enumerate(inter.iterrows())):
-            if i % 1000 == 0:
+            if i % PROCESS_CHUNK_SIZE == 0:
                 self.process_(data, path_idx=self.splits[split], final=False)
                 del data
                 data = []
@@ -400,7 +402,7 @@ class ContrastiveLGIDataset(LGIDataset):
         gs = GlycanStorage(Path(self.root).parent)
         data = []
         for i, (lectin, glycan, glycan_val, decoy, decoy_val, split) in tqdm(enumerate(lgis)):
-            if i % 1000 == 0:
+            if i % PROCESS_CHUNK_SIZE == 0:
                 self.process_(data, path_idx=self.splits[split], final=False)
                 del data
                 data = []
@@ -431,7 +433,7 @@ class ContrastiveLGIDataset(LGIDataset):
         gs = GlycanStorage(Path(self.root).parent)
         data = []
         for i, (_, row) in tqdm(enumerate(inter.iterrows())):
-            if i % 1000 == 0:
+            if i % PROCESS_CHUNK_SIZE == 0:
                 self.process_(data, path_idx=self.splits[split], final=False)
                 del data
                 data = []

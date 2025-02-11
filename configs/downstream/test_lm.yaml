@@ -19,7 +19,7 @@ model:
     learning_rate: 0.001
     batch_size: 256
     optimizer: Adam
-    suffix: _glylm_bpe_glyles_25_t6_20
+    suffix: _bpe_glyles_25_t6_20
   - name: glylm
     token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_glyles_5000.pkl
     model_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_glyles_5000_t6/checkpoint-185120
@@ -28,7 +28,7 @@ model:
     learning_rate: 0.001
     batch_size: 256
     optimizer: Adam
-    suffix: _glylm_bpe_glyles_50_t6_20
+    suffix: _bpe_glyles_50_t6_20
   - name: glylm
     token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_glyles_7500.pkl
     model_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_glyles_7500_t6/checkpoint-185120
@@ -37,7 +37,7 @@ model:
     learning_rate: 0.001
     batch_size: 256
     optimizer: Adam
-    suffix: _glylm_bpe_glyles_75_t6_20
+    suffix: _bpe_glyles_75_t6_20
   - name: glylm
     token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_glyles_10000.pkl
     model_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_glyles_10000_t6/checkpoint-185120
@@ -46,4 +46,4 @@ model:
     learning_rate: 0.001
     batch_size: 256
     optimizer: Adam
-    suffix: _glylm_bpe_glyles_100_t6_20
+    suffix: _bpe_glyles_100_t6_20
