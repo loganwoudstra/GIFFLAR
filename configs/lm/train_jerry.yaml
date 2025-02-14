@@ -3,6 +3,10 @@ root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/
 corpus_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/glycoverse_2371k.txt
 max_length: 200
 tokenizations:
+  #- name: BPE_Glyles_2500_t6
+  #  pretokenizer: glyles
+  #  tokenizer: bpe
+  #  token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_glyles_2500.pkl
   #- name: BPE_Glyles_5000_t6
   #  pretokenizer: glyles
   #  tokenizer: bpe
@@ -33,7 +37,7 @@ tokenizations:
     token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/wordpiece_glyles_10000.pkl
 model:
   epochs: 20
-  batch_size: 256
+  batch_size: 128
   num_layers: 6
   hidden_size: 320
   num_heads: 20

@@ -15,7 +15,7 @@ model:
   lectin_encoder:
     name: ESM
     layer_num: 33
-  batch_size: 128
+  batch_size: 64
   epochs: 100
   learning_rate: 0.001
   optimizer: Adam

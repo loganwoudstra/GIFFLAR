@@ -4,6 +4,7 @@ from pathlib import Path
 from datasets import load_dataset
 from jsonargparse import ArgumentParser
 from tokenizers import Encoding
+import torch
 from transformers import TrainingArguments, DataCollatorForLanguageModeling, Trainer, EsmForMaskedLM, EsmConfig
 
 from gifflar.tokenize.pretokenize import GlycoworkPreTokenizer, GrammarPreTokenizer
@@ -57,6 +58,9 @@ def train(**kwargs):
         num_train_epochs=kwargs["model"]["epochs"],
         per_device_train_batch_size=kwargs["model"]["batch_size"],
         save_strategy="epoch",
+        # fp16=True,
+        # gradient_checkpointing=True,
+        dataloader_num_workers=15,
     )
 
     trainer = Trainer(
@@ -66,6 +70,9 @@ def train(**kwargs):
         tokenizer=tokenizer,
         train_dataset=proc_ds["train"],
     )
+
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
 
     trainer.train()
 

@@ -19,50 +19,50 @@ tokenizations:
     pretokenizer: glyles
     tokenizer: bpe
     token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_glyles_10000.pkl
-  - name: WP_GlyLES_2500
-    pretokenizer: glyles
-    tokenizer: wp
-    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/wp_glyles_2500.pkl
-  - name: WP_GlyLES_5000
-    pretokenizer: glyles
-    tokenizer: wp
-    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/wp_glyles_5000.pkl
-  - name: WP_GlyLES_7500
-    pretokenizer: glyles
-    tokenizer: wp
-    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/wp_glyles_7500.pkl
-  - name: WP_GlyLES_10000
-    pretokenizer: glyles
-    tokenizer: wp
-    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/wp_glyles_10000.pkl
-  - name: BPE_Lib_2500
-    pretokenizer: lib
-    tokenizer: bpe
-    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_2500.pkl
-  - name: BPE_Lib_5000
-    pretokenizer: lib
-    tokenizer: bpe
-    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_5500.pkl
-  - name: BPE_Lib_7500
-    pretokenizer: lib
-    tokenizer: bpe
-    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_7500.pkl
-  - name: BPE_Lib_10000
-    pretokenizer: lib
-    tokenizer: bpe
-    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_10000.pkl
-  - name: WP_Lib_5000
-    pretokenizer: lib
-    tokenizer: bpe
-    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_5500.pkl
-  - name: WP_Lib_7500
-    pretokenizer: lib
-    tokenizer: bpe
-    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_7500.pkl
-  - name: WP_Lib_10000
-    pretokenizer: lib
-    tokenizer: bpe
-    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_10000.pkl
+  # - name: WP_GlyLES_2500
+  #   pretokenizer: glyles
+  #   tokenizer: wp
+  #   token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/wp_glyles_2500.pkl
+  # - name: WP_GlyLES_5000
+  #   pretokenizer: glyles
+  #   tokenizer: wp
+  #   token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/wp_glyles_5000.pkl
+  # - name: WP_GlyLES_7500
+  #   pretokenizer: glyles
+  #   tokenizer: wp
+  #   token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/wp_glyles_7500.pkl
+  # - name: WP_GlyLES_10000
+  #   pretokenizer: glyles
+  #   tokenizer: wp
+  #   token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/wp_glyles_10000.pkl
+  # - name: BPE_Lib_2500
+  #   pretokenizer: lib
+  #   tokenizer: bpe
+  #   token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_2500.pkl
+  # - name: BPE_Lib_5000
+  #   pretokenizer: lib
+  #   tokenizer: bpe
+  #   token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_5500.pkl
+  # - name: BPE_Lib_7500
+  #   pretokenizer: lib
+  #   tokenizer: bpe
+  #   token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_7500.pkl
+  # - name: BPE_Lib_10000
+  #   pretokenizer: lib
+  #   tokenizer: bpe
+  #   token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_10000.pkl
+  # - name: WP_Lib_5000
+  #   pretokenizer: lib
+  #   tokenizer: bpe
+  #   token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_5500.pkl
+  # - name: WP_Lib_7500
+  #   pretokenizer: lib
+  #   tokenizer: bpe
+  #   token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_7500.pkl
+  # - name: WP_Lib_10000
+  #   pretokenizer: lib
+  #   tokenizer: bpe
+  #   token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_10000.pkl
 model:
   epochs: 20
   batch_size: 256

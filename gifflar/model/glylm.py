@@ -8,13 +8,15 @@ from gifflar.tokenize.pretokenize import GlycoworkPreTokenizer, GrammarPreTokeni
 from gifflar.tokenize.tokenizer import GIFFLARTokenizer
 
 def pipeline(tokenizer, glycan_lm, iupac):
+    # print(iupac)
     try:
         tokens = tokenizer(iupac)
         input_ids = torch.tensor(tokens["input_ids"]).unsqueeze(0).to(glycan_lm.device)
         attention = torch.tensor(tokens["attention_mask"]).unsqueeze(0).to(glycan_lm.device)
         with torch.no_grad():
             return glycan_lm(input_ids, attention).last_hidden_state
-    except:
+    except Exception as e:
+        # raise e
         return None
 
 
@@ -25,6 +27,7 @@ class GlycanLM(DownstreamGGIN):
 
         pretokenizer = GrammarPreTokenizer() if "glyles" in token_file else GlycoworkPreTokenizer()
         mode = "BPE" if "bpe" in token_file else "WP"
+        print(pretokenizer, mode)
         tokenizer = GIFFLARTokenizer(pretokenizer, mode)
         tokenizer.load(token_file)
         glycan_lm = EsmModel.from_pretrained(model_dir)
@@ -41,8 +44,7 @@ class GlycanLM(DownstreamGGIN):
         Returns:
             Dict holding the node embeddings (None for the MLP), the graph embedding, and the final model prediction
         """
-        with torch.no_grad():
-            graph_embeddings = torch.cat([self.encoder(iupac).mean(dim=1) for iupac in batch["IUPAC"]], dim=0).to(self.device)
+        graph_embeddings = torch.cat([self.encoder(iupac).mean(dim=1) for iupac in batch["IUPAC"]], dim=0).to(self.device)
         return {
             "node_embed": None,
             "graph_embed": graph_embeddings,

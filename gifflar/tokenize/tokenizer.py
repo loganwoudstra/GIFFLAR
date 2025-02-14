@@ -108,7 +108,7 @@ class GIFFLARTokenizer(PreTrainedTokenizerFast):
         token_type_ids = []
         attention_mask = []
         for token in tokens:
-            input_ids.append(self.vocab_[token])
+            input_ids.append(self.vocab_.get(token, self.unk_token_id))
             token_type_ids.append(0)
             attention_mask.append(1)
 

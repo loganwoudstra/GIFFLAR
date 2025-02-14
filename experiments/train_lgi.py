@@ -126,8 +126,6 @@ def train_contrastive(**kwargs):
         logger=logger,
         max_epochs=kwargs["model"]["epochs"],
         accelerator="gpu",
-        limit_train_batches=10,
-        limit_val_batches=10,
     )
     start = time.time()
     trainer.fit(model, datamodule)
