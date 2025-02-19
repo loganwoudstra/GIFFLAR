@@ -95,3 +95,12 @@ model:
     optimizer: Adam
     pooling: global_mean
     suffix: _128_8_gp
+  - name: glylm
+    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_glyles_2500.pkl
+    model_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_glyles_2500_t6/checkpoint-185120
+    hidden_dim: 320
+    epochs: 100
+    learning_rate: 0.001
+    batch_size: 256
+    optimizer: Adam
+    suffix: _bpe_glyles_25_t6_20

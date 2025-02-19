@@ -1,0 +1,18 @@
+seed: 42
+root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data
+logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs
+datasets:
+  - name: Tissue
+    task: multilabel
+  - name: Taxonomy_Domain
+    task: multilabel
+model:
+  - name: glylm
+    token_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_5000.pkl
+    model_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/bpe_lib_5000_t6/checkpoint-5927260
+    hidden_dim: 320
+    epochs: 100
+    learning_rate: 0.001
+    batch_size: 256
+    optimizer: Adam
+    suffix: _lib_bpe_50_t6_20
