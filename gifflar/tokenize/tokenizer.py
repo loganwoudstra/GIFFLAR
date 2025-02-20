@@ -83,7 +83,7 @@ class GIFFLARTokenizer(PreTrainedTokenizerFast):
             i = len(word)
             while i > 0 and word[:i] not in self.vocab_:
                 i -= 1
-            if i == 0:
+            if (i == 0 and len(tokens) == 0) or i == 2:
                 tokens.append("[UNK]")
                 word = word[3:]
                 if len(word) == 0:
