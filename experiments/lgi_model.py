@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import torch
+import torch.nn as nn
 from pytorch_lightning import LightningModule
 from torch_geometric.data import HeteroData
 
@@ -10,6 +11,9 @@ from gifflar.data.hetero import HeteroDataBatch
 from gifflar.model.base import GlycanGIN
 from gifflar.model.baselines.sweetnet import SweetNetLightning
 from gifflar.model.utils import GIFFLARPooling, LectinStorage, get_prediction_head
+from gifflar.utils import get_metrics
+
+THRESHOLD = 0.5
 
 
 class LGI_Model(LightningModule):
@@ -18,6 +22,7 @@ class LGI_Model(LightningModule):
             glycan_encoder: GlycanGIN | SweetNetLightning,
             lectin_encoder: str,
             le_layer_num: int,
+            add_tasks: list[str, str] = [],
             **kwargs: Any,
     ):
         """
@@ -35,6 +40,7 @@ class LGI_Model(LightningModule):
         self.glycan_pooling = GIFFLARPooling("global_mean")
         self.lectin_encoder = lectin_encoder
         self.le_layer_num = le_layer_num
+        self.add_tasks = add_tasks
 
         self.lectin_embeddings = LectinStorage(
             encoder=ENCODER_MAP[lectin_encoder](le_layer_num), 
@@ -45,14 +51,18 @@ class LGI_Model(LightningModule):
         self.combined_dim = glycan_encoder.hidden_dim + EMBED_SIZES[lectin_encoder]
 
         self.head, self.loss, self.metrics = get_prediction_head(self.combined_dim, 1, "regression", size="large")
+        self.add_metrics = [get_metrics(task=task, n_outputs=1, prefix=name) for name, task in self.add_tasks]
 
     def to(self, device: torch.device):
         super(LGI_Model, self).to(device)
         self.glycan_encoder.to(device)
         self.glycan_pooling.to(device)
         self.head.to(device)
-        for split, metric in self.metrics.items():
-            self.metrics[split] = metric.to(device)
+
+        self.metrics = {split: metric.to(device) for split, metric in self.metrics.items()}
+        self.add_metrics = [{split: metric.to(device) for split, metric in metrics.items()} for metrics in self.add_metrics]
+        
+        return self
 
     def forward(self, data: HeteroDataBatch) -> dict[str, torch.Tensor]:
         glycan_embed = self.glycan_encoder(data)
@@ -67,7 +77,7 @@ class LGI_Model(LightningModule):
             "preds": pred,
         }
 
-    def shared_step(self, batch: HeteroData, stage: str) -> dict[str, torch.Tensor]:
+    def shared_step(self, batch: HeteroData, stage: str, batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
         """
         Compute the shared step of the model.
 
@@ -79,27 +89,38 @@ class LGI_Model(LightningModule):
             A dictionary containing the loss and the metrics
         """
         fwd_dict = self(batch)
-        fwd_dict["labels"] = batch["y"]# .reshape(-1)
+        fwd_dict["labels"] = batch["y"]
         fwd_dict["preds"] = fwd_dict["preds"].reshape(-1)
-        fwd_dict["loss"] = self.loss(fwd_dict["preds"], fwd_dict["labels"])
-        self.metrics[stage].update(fwd_dict["preds"], fwd_dict["labels"])
-        self.log(f"{stage}/loss", fwd_dict["loss"], batch_size=len(fwd_dict["preds"]))
-
+        if dataloader_idx == 0:
+            fwd_dict["loss"] = self.loss(fwd_dict["preds"], fwd_dict["labels"])
+            self.metrics[stage].update(fwd_dict["preds"], fwd_dict["labels"])
+            self.log(f"{stage}/loss", fwd_dict["loss"], batch_size=len(fwd_dict["preds"]), add_dataloader_idx=False)
+        else:
+            name, task = self.add_tasks[dataloader_idx - 1]
+            if task == "classification":
+                fwd_dict["preds"] = (fwd_dict["preds"] > THRESHOLD).float()
+                fwd_dict["loss"] = nn.BCELoss()(fwd_dict["preds"], fwd_dict["labels"].float())
+                self.add_metrics[dataloader_idx - 1][stage].update(fwd_dict["preds"], fwd_dict["labels"])
+                self.log(f"{stage}/{name}/loss", fwd_dict["loss"], batch_size=len(fwd_dict["preds"]), add_dataloader_idx=False)
+            elif task == "regression":
+                pass
+            else:
+                raise ValueError(f"Task {task} is not supported")
         return fwd_dict
 
-    def training_step(self, batch: HeteroData, batch_idx: int) -> dict[str, torch.Tensor]:
+    def training_step(self, batch: HeteroData, batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
         """Compute the training step of the model"""
-        return self.shared_step(batch, "train")
+        return self.shared_step(batch, "train", batch_idx, dataloader_idx)
 
-    def validation_step(self, batch: HeteroData, batch_idx: int) -> dict[str, torch.Tensor]:
+    def validation_step(self, batch: HeteroData, batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
         """Compute the validation step of the model"""
-        return self.shared_step(batch, "val")
+        return self.shared_step(batch, "val", batch_idx, dataloader_idx)
 
-    def test_step(self, batch: HeteroData, batch_idx: int) -> dict[str, torch.Tensor]:
+    def test_step(self, batch: HeteroData, batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
         """Compute the testing step of the model"""
-        return self.shared_step(batch, "test")
+        return self.shared_step(batch, "test", batch_idx, dataloader_idx)
 
-    def predict_step(self, batch: HeteroData, batch_idx: int) -> dict[str, torch.Tensor]:
+    def predict_step(self, batch: HeteroData, batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
         fwd_dict = self(batch)
         fwd_dict["IUPAC"] = batch["IUPAC"]
         fwd_dict["seq"] = batch["aa_seq"]
@@ -112,9 +133,12 @@ class LGI_Model(LightningModule):
         Args:
             stage: The stage of the model
         """
-        metrics = self.metrics[stage].compute()
-        self.log_dict(metrics)
-        self.metrics[stage].reset()
+        for loggable in [self.metrics[stage]] + [self.add_metrics[i][stage] for i in range(len(self.add_metrics))]:
+            if list(loggable.values())[0].update_count == 0:
+                continue
+            metrics = loggable.compute()
+            self.log_dict(metrics)
+            loggable.reset()
 
     def on_train_epoch_end(self) -> None:
         """Compute the end of the training epoch"""

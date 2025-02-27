@@ -38,11 +38,13 @@ class ContrastLGIModel(LGI_Model):
             latent_dim: int = 256,
             margin_distance: Literal["sigmoid", "cosine"] = "cosine",
             margin: float = 0.25,
+            add_tasks: list[str, str] = [],
             ** kwargs: Any,
     ):
         super(ContrastLGIModel, self).__init__(glycan_encoder, lectin_encoder, le_layer_num, **kwargs)
 
         self.latent_dim = latent_dim
+        self.add_tasks = add_tasks
 
         self.glycan_red = nn.Linear(glycan_encoder.hidden_dim, latent_dim)
         self.lectin_red = nn.Linear(EMBED_SIZES[lectin_encoder], latent_dim)
@@ -74,7 +76,7 @@ class ContrastLGIModel(LGI_Model):
 
         return fwd_dict
 
-    def shared_step(self, batch: HeteroDataBatch, decoys: HeteroDataBatch | None, stage: str) -> dict[str, torch.Tensor]:
+    def shared_step(self, batch: HeteroDataBatch, decoys: HeteroDataBatch | None, stage: str, batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
         fwd_dict = self.forward(batch, decoys)
         fwd_dict["labels"] = batch["y"].float()
 
@@ -96,20 +98,20 @@ class ContrastLGIModel(LGI_Model):
         self.log(f"{stage}/loss", fwd_dict["loss"], batch_size=len(fwd_dict["preds"]))
         return fwd_dict
 
-    def training_step(self, batch: tuple[HeteroDataBatch, HeteroDataBatch | None], batch_idx: int) -> dict[str, torch.Tensor]:
+    def training_step(self, batch: tuple[HeteroDataBatch, HeteroDataBatch | None], batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
         """Compute the training step of the model"""
-        return self.shared_step(batch[0], batch[1], "train")
+        return self.shared_step(batch[0], batch[1], "train", batch_idx, dataloader_idx)
 
-    def validation_step(self, batch: tuple[HeteroDataBatch, HeteroDataBatch | None], batch_idx: int) -> dict[str, torch.Tensor]:
+    def validation_step(self, batch: tuple[HeteroDataBatch, HeteroDataBatch | None], batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
         """Compute the validation step of the model"""
-        return self.shared_step(batch[0], batch[1], "val")
+        return self.shared_step(batch[0], batch[1], "val", batch_idx, dataloader_idx)
 
-    def test_step(self, batch: tuple[HeteroDataBatch, HeteroDataBatch | None], batch_idx: int) -> dict[str, torch.Tensor]:
+    def test_step(self, batch: tuple[HeteroDataBatch, HeteroDataBatch | None], batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
         """Compute the testing step of the model"""
-        return self.shared_step(batch[0], batch[1], "test")
+        return self.shared_step(batch[0], batch[1], "test", batch_idx, dataloader_idx)
 
-    def predict_step(self, batch: tuple[HeteroDataBatch, HeteroDataBatch | None], batch_idx: int) -> dict[str, torch.Tensor]:
-        fwd_dict = self(batch)
+    def predict_step(self, batch: tuple[HeteroDataBatch, HeteroDataBatch | None], batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
+        fwd_dict = self.forward(batch, batch[1])
         fwd_dict["IUPAC"] = batch["IUPAC"]
         fwd_dict["seq"] = batch["aa_seq"]
         return fwd_dict

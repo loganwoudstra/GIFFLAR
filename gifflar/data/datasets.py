@@ -87,6 +87,7 @@ class GlycanOnDiskDataset(OnDiskDataset):
         if final:
             self.db.close()
             self._db = None
+            print("Saving dataset arguments to", Path(self.processed_paths[path_idx]).with_suffix(".pth"))
             torch.save(self.dataset_args, Path(self.processed_paths[path_idx]).with_suffix(".pth"))
     
     def serialize(self, data: BaseData) -> Any:
@@ -192,7 +193,7 @@ class PretrainGDs(GlycanDataset):
         gs = GlycanStorage(Path(self.root).parent)
         with open(self.filename, "r") as glycans:
             for i, line in enumerate(glycans.readlines()):
-                if i % PROCESS_CHUNK_SIZE == 0:
+                if len(data) % PROCESS_CHUNK_SIZE == 0:
                     self.process_(data, final=False)
                     del data
                     data = []
@@ -280,7 +281,7 @@ class DownstreamGDs(GlycanDataset):
         gs = GlycanStorage(Path(self.root).parent)
         data = []
         for i, (_, row) in tqdm(enumerate(df.iterrows())):
-            if i % PROCESS_CHUNK_SIZE == 0:
+            if len(data) % PROCESS_CHUNK_SIZE == 0:
                 self.process_(data, path_idx=self.splits[self.split], final=False)
                 del data
                 data = []
@@ -312,6 +313,7 @@ class LGIDataset(DownstreamGDs):
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
             force_reload: bool = False,
+            scheme: Schema = object,
             **dataset_args: dict[str, Any],
     ):
         """
@@ -326,7 +328,7 @@ class LGIDataset(DownstreamGDs):
             pre_transform: The pre-transform to apply to the data
             **dataset_args: Additional arguments to pass to the dataset
         """
-        super().__init__(root=root, filename=filename, split=split, hash_code=hash_code, schema=(object, object), transform=transform,
+        super().__init__(root=root, filename=filename, split=split, hash_code=hash_code, schema=scheme, transform=transform,
                          pre_transform=pre_transform, force_reload=force_reload, **dataset_args)
     
     def process(self) -> None:
@@ -344,8 +346,8 @@ class LGIDataset(DownstreamGDs):
         gs = GlycanStorage(Path(self.root).parent)
         data = []
         for i, (lectin_id, glycan_id, value, split) in tqdm(enumerate(inter)):
-            if i % PROCESS_CHUNK_SIZE == 0:
-                self.process_(data, path_idx=self.splits[split], final=False)
+            if len(data) % PROCESS_CHUNK_SIZE == 0:
+                self.process_(data, path_idx=self.splits[self.split], final=False)
                 del data
                 data = []
             if split != self.split:
@@ -356,18 +358,18 @@ class LGIDataset(DownstreamGDs):
             d["aa_seq"] = lectin_map[lectin_id]
             d["y"] = torch.tensor([value])
             d["ID"] = i
-            data[split].append(d)
+            data.append(d)
 
         gs.close()
-        self.process_(data, path_idx=self.splits[split], final=True)
+        self.process_(data, path_idx=self.splits[self.split], final=True)
 
     def process_csv(self, sep: str) -> None:
         inter = pd.read_csv(self.filename, sep=sep)
         gs = GlycanStorage(Path(self.root).parent)
         data = []
         for i, (_, row) in tqdm(enumerate(inter.iterrows())):
-            if i % PROCESS_CHUNK_SIZE == 0:
-                self.process_(data, path_idx=self.splits[split], final=False)
+            if len(data) % PROCESS_CHUNK_SIZE == 0:
+                self.process_(data, path_idx=self.splits[self.split], final=False)
                 del data
                 data = []
             split = getattr(row, "split", "train")
@@ -382,10 +384,35 @@ class LGIDataset(DownstreamGDs):
             data.append(d)
         
         gs.close()
-        self.process_(data, path_idx=self.splits[split], final=True)
+        self.process_(data, path_idx=self.splits[self.split], final=True)
 
 
 class ContrastiveLGIDataset(LGIDataset):
+    def __init__(
+            self,
+            root: str | Path,
+            filename: str | Path,
+            split: str,
+            hash_code: str,
+            transform: Optional[Callable] = None,
+            pre_transform: Optional[Callable] = None,
+            force_reload: bool = False,
+            **dataset_args: dict[str, Any],
+    ):
+        """
+        Initialize the dataset for downstream tasks with the given parameters.
+
+        Args:
+            root: The root directory to store the processed data
+            filename: The filename of the data to process
+            split: The split to use, e.g., train, val, test
+            hash_code: The hash code to use for the processed data
+            transform: The transform to apply to the data
+            pre_transform: The pre-transform to apply to the data
+            **dataset_args: Additional arguments to pass to the dataset
+        """
+        super().__init__(root=root, filename=filename, split=split, hash_code=hash_code, schema=(object, object), transform=transform,
+                         pre_transform=pre_transform, force_reload=force_reload, **dataset_args)
     def _inter_process(self, data: list[HeteroData], path_idx: int) -> None:
         db = self.get_db(path_idx)
         if len(data) != 0:
@@ -402,8 +429,8 @@ class ContrastiveLGIDataset(LGIDataset):
         gs = GlycanStorage(Path(self.root).parent)
         data = []
         for i, (lectin, glycan, glycan_val, decoy, decoy_val, split) in tqdm(enumerate(lgis)):
-            if i % PROCESS_CHUNK_SIZE == 0:
-                self.process_(data, path_idx=self.splits[split], final=False)
+            if len(data) % PROCESS_CHUNK_SIZE == 0:
+                self.process_(data, path_idx=self.splits[self.split], final=False)
                 del data
                 data = []
             if split != self.split:
@@ -433,8 +460,8 @@ class ContrastiveLGIDataset(LGIDataset):
         gs = GlycanStorage(Path(self.root).parent)
         data = []
         for i, (_, row) in tqdm(enumerate(inter.iterrows())):
-            if i % PROCESS_CHUNK_SIZE == 0:
-                self.process_(data, path_idx=self.splits[split], final=False)
+            if len(data) % PROCESS_CHUNK_SIZE == 0:
+                self.process_(data, path_idx=self.splits[self.split], final=False)
                 del data
                 data = []
             split = getattr(row, "split", "train")
@@ -450,4 +477,4 @@ class ContrastiveLGIDataset(LGIDataset):
             data.append((d, decoy))
         
         gs.close()
-        self.process_(data, path_idx=self.splits[split], final=True)
+        self.process_(data, path_idx=self.splits[self.split], final=True)

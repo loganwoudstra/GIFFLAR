@@ -5,6 +5,9 @@ seed: 42
 root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/lgi_data
 logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/lgi_logs
 origin: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/contrastive_data.pkl
+add_valid:
+  - path: /home/rjo21/Desktop/GIFFLAR/datasets/unilectin.tsv
+    type: classification
 model:
   glycan_encoder:
     name: gifflar

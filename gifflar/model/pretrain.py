@@ -134,7 +134,7 @@ class PretrainGGIN(GlycanGIN):
 
         return {}
 
-    def shared_step(self, batch: HeteroDataBatch, stage: Literal["train", "val", "test"]) -> dict[str, torch.Tensor]:
+    def shared_step(self, batch: HeteroDataBatch, stage: Literal["train", "val", "test"], batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
         """
         Shared step for training, validation and testing steps. Forwarding the batch through the model and computing
         the loss and metrics.

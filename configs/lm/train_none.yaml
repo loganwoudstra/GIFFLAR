@@ -1,0 +1,23 @@
+seed: 42
+root_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/
+corpus_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/glycoverse_2371k.txt
+# corpus_file: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/glycans_1000.txt
+max_length: 500
+tokenizations:
+  - name: None_GlyLES_263_t6
+    pretokenizer: glyles  # 'glyles' or 'lib' or 'char' (only with tokenizer: none)
+    tokenizer: none  # 'bpe' or 'wp' or 'none'
+    token_file: datasets/glyles.txt
+  - name: None_Lib_2373_t6
+    pretokenizer: lib
+    tokenizer: none
+    token_file: datasets/lib.txt
+  - name: None_Char_0_t6
+    pretokenizer: char
+    tokenizer: none
+model:
+  epochs: 20
+  batch_size: 8
+  num_layers: 6
+  hidden_size: 320
+  num_heads: 20

@@ -87,7 +87,7 @@ class DownstreamGGIN(GlycanGIN):
             "preds": pred,
         }
 
-    def shared_step(self, batch: HeteroData, stage: Literal["train", "val", "test"]) -> dict[str, torch.Tensor]:
+    def shared_step(self, batch: HeteroData, stage: Literal["train", "val", "test"], batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
         """
         Shared step for training, validation and testing steps.
 

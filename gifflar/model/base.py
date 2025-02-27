@@ -96,18 +96,18 @@ class GlycanGIN(LightningModule):
 
         return batch.x_dict
 
-    def shared_step(self, batch: HeteroData, stage: Literal["train", "val", "test"]) -> dict[str, torch.Tensor]:
+    def shared_step(self, batch: HeteroData, stage: Literal["train", "val", "test"], batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
         raise NotImplementedError()
 
-    def training_step(self, batch: HeteroData, batch_idx: int) -> dict[str, torch.Tensor]:
+    def training_step(self, batch: HeteroData, batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
         """Compute the training step of the model"""
         return self.shared_step(batch, "train")
 
-    def validation_step(self, batch: HeteroData, batch_idx: int) -> dict[str, torch.Tensor]:
+    def validation_step(self, batch: HeteroData, batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
         """Compute the validation step of the model"""
         return self.shared_step(batch, "val")
 
-    def test_step(self, batch: HeteroData, batch_idx: int) -> dict[str, torch.Tensor]:
+    def test_step(self, batch: HeteroData, batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
         """Compute the testing step of the model"""
         return self.shared_step(batch, "test")
 
