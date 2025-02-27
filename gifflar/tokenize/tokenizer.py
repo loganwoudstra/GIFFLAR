@@ -1,6 +1,7 @@
 import pickle
 from pathlib import Path
 from typing import Literal
+import string
 
 import transformers
 from tokenizers import Tokenizer, models
@@ -97,13 +98,30 @@ class GIFFLARTokenizer(PreTrainedTokenizerFast):
         return tokens
 
     def load(self, path):
-        with open(path, "rb") as f:
-            base_vocab, self.merges_ = pickle.load(f)
+        if path is None:
+            base_vocab = list(string.printable)
+        else:
+            path = Path(path)
+            if path.suffix == ".pkl":
+                with open(path, "rb") as f:
+                    base_vocab, self.merges_ = pickle.load(f)
+            else:  # .txt files in case of "NONE" tokenization
+                with open(path, "r") as f:
+                    base_vocab = [v.strip() for v in f.readlines()]
         self.vocab_.update({v: i + self.eos_token_id for i, v in enumerate(base_vocab)})
         return self
 
     def __call__(self, text, *args, **kwargs):
-        tokens = self.bpe_tokenize(text) if self.mode == "BPE" else self.wordpiece_tokenize(text)
+        # TODO: Make use of kwargs["padding", "truncation", and "max_length"]!
+        if self.mode == "BPE":
+            tokens = self.bpe_tokenize(text)
+        elif self.mode == "WP":
+            tokens = self.wordpiece_tokenize(text)
+        elif self.mode == "NONE":
+            tokens = self.pre_tokenizer_(text)
+            if tokens is None:
+                tokens = [self.unk_token]
+
         input_ids = []
         token_type_ids = []
         attention_mask = []

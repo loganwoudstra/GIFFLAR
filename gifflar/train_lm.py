@@ -1,3 +1,6 @@
+# import os
+# os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+
 import copy
 from pathlib import Path
 
@@ -7,7 +10,7 @@ from tokenizers import Encoding
 import torch
 from transformers import TrainingArguments, DataCollatorForLanguageModeling, Trainer, EsmForMaskedLM, EsmConfig
 
-from gifflar.tokenize.pretokenize import GlycoworkPreTokenizer, GrammarPreTokenizer
+from gifflar.tokenize.pretokenize import GlycoworkPreTokenizer, GrammarPreTokenizer, CharacterPreTokenizer
 from gifflar.tokenize.tokenizer import GIFFLARTokenizer
 from gifflar.utils import read_yaml_config
 
@@ -20,9 +23,16 @@ from gifflar.utils import read_yaml_config
 # t36: 36 layers, 2560 hidden size, 20 attention heads,   3B parameters
 # t48: 48 layers, 5120 hidden size, 20 attention heads,  15B parameters
 
+
+PRE_TOKENIZERS = {
+    "lib": GlycoworkPreTokenizer,
+    "glyles": GrammarPreTokenizer,
+    "char": CharacterPreTokenizer,
+}
+
 def train(**kwargs):
     pretokenizer = GrammarPreTokenizer() if kwargs["tokenization"]["pretokenizer"] == "glyles" else GlycoworkPreTokenizer()
-    tokenizer = GIFFLARTokenizer(pretokenizer, kwargs["tokenization"]["tokenizer"].upper()).load(kwargs["tokenization"]["token_file"])
+    tokenizer = GIFFLARTokenizer(pretokenizer, kwargs["tokenization"]["tokenizer"].upper()).load(kwargs["tokenization"].get("token_file", None))
         
     def tokenize_function(entries: dict) -> Encoding:
         return tokenizer(entries["text"], padding="max_length", truncation=True, max_length=kwargs["max_length"])
@@ -46,7 +56,7 @@ def train(**kwargs):
 
     model = EsmForMaskedLM(
         config=esm_config,
-    )
+    )# .to("cpu")
 
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=True, mlm_probability=0.15)
 
@@ -60,7 +70,8 @@ def train(**kwargs):
         save_strategy="epoch",
         # fp16=True,
         # gradient_checkpointing=True,
-        dataloader_num_workers=15,
+        dataloader_num_workers=1,
+        # use_cpu=True,
     )
 
     trainer = Trainer(

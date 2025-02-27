@@ -129,14 +129,10 @@ class GlycoworkPreTokenizer(PreTokenizer):
 
 
 class GrammarPreTokenizer(PreTokenizer):
-    def __init__(self):
-        self.io = io.StringIO()
-
     def __call__(self, iupac: str):
-        # self.io.truncate(0)
         iupac = iupac.strip().replace(" ", "")
-        token = CommonTokenStream(lexer := GlycanLexer(InputStream(data="#" + iupac + "#")))  # ), output=self.io))
-        parser = GlycanParser(token)  # , output=self.io).start()
+        token = CommonTokenStream(lexer := GlycanLexer(InputStream(data="#" + iupac + "#")))
+        parser = GlycanParser(token)
 
         lexer.removeErrorListeners()
         lexer.addErrorListener(GlyLESErrorListener())
@@ -146,8 +142,11 @@ class GrammarPreTokenizer(PreTokenizer):
         try:
             parser.start()
         except Exception as e:
-            with open("lm_logs.txt", "a") as f:
-                print(iupac, ":", e, file=f)
             return None
 
         return [t.text for t in token.tokens[1:-2]]
+
+
+class CharacterPreTokenizer(PreTokenizer):
+    def __call__(self, iupac: str):
+        return list(iupac)
