@@ -127,7 +127,6 @@ class DownstreamGDM(GlycanDataModule):
             pre_transform: Optional[Callable] = None,
             force_reload: bool = False,
             num_workers: int = 0,
-            no_train: bool = False,
             **dataset_args: dict[str, Any],
     ):
         """
@@ -142,17 +141,13 @@ class DownstreamGDM(GlycanDataModule):
             pre_transform: The pre-transform to apply to the data
             force_reload: Whether to force reload the data
             num_workers: The number of CPUs to use for loading the data
-            no_train: Whether this datamodule is only for validation and testing
             **dataset_args: Additional arguments to pass to the DownstreamGDs
         """
         super().__init__(batch_size, num_workers=num_workers)
-        if no_train:
-            self.train = None
-        else:
-            self.train = self.ds_class(
-                root=root, filename=filename, split="train", hash_code=hash_code, transform=transform,
-                pre_transform=pre_transform, force_reload=force_reload, **dataset_args,
-            )
+        self.train = self.ds_class(
+            root=root, filename=filename, split="train", hash_code=hash_code, transform=transform,
+            pre_transform=pre_transform, force_reload=force_reload, **dataset_args,
+        )
         self.val = self.ds_class(
             root=root, filename=filename, split="val", hash_code=hash_code, transform=transform,
             pre_transform=pre_transform, **dataset_args,

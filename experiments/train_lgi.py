@@ -1,28 +1,39 @@
 import os
-
-from experiments.contrastive_model import ContrastLGIModel
 # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 from argparse import ArgumentParser
 import time
 import copy
 from pathlib import Path
+
+import pandas as pd
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import RichProgressBar, RichModelSummary, ModelCheckpoint
 from pytorch_lightning.loggers import CSVLogger
 from torch_geometric import seed_everything
 
-from experiments.lgi_model import LGI_Model
 from gifflar.data.modules import LGI_GDM, ConstrastiveGDM
 from gifflar.model.baselines.sweetnet import SweetNetLightning
 from gifflar.model.downstream import DownstreamGGIN
 from gifflar.pretransforms import get_pretransforms
 from gifflar.utils import read_yaml_config, hash_dict
+from experiments.lgi_model import LGI_Model
+from experiments.contrastive_model import ContrastLGIModel
 
 GLYCAN_ENCODERS = {
     "gifflar": DownstreamGGIN,
     "sweetnet": SweetNetLightning,
 }
+
+
+def collect_metrics(path: Path):
+    this = pd.read_csv(path / "metrics.csv")
+    if (path / "resuming.txt").exists():
+        with open(path / "resuming.txt") as f:
+            parent = f.readlines()[0].strip().split(" ")[-1]
+        df = collect_metrics(Path(parent))
+        return pd.concat([df, this], ignore_index=True)
+    return this
 
 
 def unfold_config(config: dict):
@@ -46,7 +57,7 @@ def unfold_config(config: dict):
             yield tmp_config
 
 
-def train(contrastive: bool = False, **kwargs):
+def train(contrastive: bool = False, ckpt_file: Path | None = None, **kwargs):
     kwargs["pre-transforms"] = {"GIFFLARTransform": "", "SweetNetTransform": ""}
     kwargs["hash"] = hash_dict(kwargs["pre-transforms"])
     seed_everything(kwargs["seed"])
@@ -71,7 +82,7 @@ def train(contrastive: bool = False, **kwargs):
         add_validation.append(LGI_GDM(
             root=kwargs["root_dir"], filename=entry["path"], hash_code=kwargs["hash"],
             batch_size=kwargs["model"].get("batch_size", 1), transform=None, num_workers=12,
-            pre_transform=get_pretransforms("", **(kwargs["pre-transforms"] or {})), no_train=True,
+            pre_transform=get_pretransforms("", **(kwargs["pre-transforms"] or {})), 
         ))
         add_tasks.append((entry["name"], entry["task"]))
 
@@ -92,6 +103,10 @@ def train(contrastive: bool = False, **kwargs):
         **kwargs,
     )
     model.to("cuda")
+
+    if ckpt_file is not None:
+        with open(Path(logger.log_dir) / "resuming.txt", "w") as f:
+            print(f"Resuming from {ckpt_file.parent.parent}", file=f)
 
     trainer = Trainer(
         callbacks=[
@@ -117,8 +132,10 @@ def train(contrastive: bool = False, **kwargs):
         model, 
         train_dataloaders=datamodule.train_dataloader(), 
         val_dataloaders=[datamodule.val_dataloader()] + [add_val.val_dataloader() for add_val in add_validation],
+        ckpt_path=ckpt_file,
     )
     print("Training took", time.time() - start, "s")
+    collect_metrics(Path(logger.log_dir)).to_csv(Path(logger.log_dir) / "comb_metrics.csv", index=False)
 
 
 def train_contrastive(**kwargs):
@@ -165,9 +182,15 @@ def train_contrastive(**kwargs):
 
 
 def main(mode, config):
-    custom_args = read_yaml_config(config)
-    for args in unfold_config(custom_args):
-        train(contrastive=mode == "contrastive", **args)
+    if (c := Path(config)).is_file():
+        custom_args = read_yaml_config(config)
+        for args in unfold_config(custom_args):
+            train(contrastive=mode == "contrastive", **args)
+    elif c.is_dir():
+        if not ((c / "hparams.yaml").exists() and (c / "metrics.csv").exists() and (c / "weights" / "last.ckpt").exists()):
+            raise FileNotFoundError("One or multiple of hparams.yaml, metrics.csv, or weights/last.ckpt are missing. No training can be resumed.")
+        custom_args = read_yaml_config(c / "hparams.yaml")
+        train(contrastive=mode == "contrastive", ckpt_file=c / "weights" / "last.ckpt", **custom_args)
 
 
 if __name__ == '__main__':

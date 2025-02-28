@@ -10,6 +10,7 @@ from experiments.protein_encoding import EMBED_SIZES
 from gifflar.data.hetero import HeteroDataBatch
 from gifflar.model.base import GlycanGIN
 from gifflar.model.baselines.sweetnet import SweetNetLightning
+from gifflar.utils import get_metrics
 
 
 def sigmoid_cosine_distance_p(x, y, p=1):
@@ -51,6 +52,7 @@ class ContrastLGIModel(LGI_Model):
 
         self.pred_loss = nn.MSELoss()
         self.embed_loss = nn.TripletMarginWithDistanceLoss(distance_function=DISTANCES[margin_distance], margin=margin)
+        self.add_metrics = [get_metrics(task=task, n_outputs=1, prefix=name) for name, task in self.add_tasks]
 
     def to(self, device: torch.device):
         super(ContrastLGIModel, self).to(device)
@@ -76,75 +78,48 @@ class ContrastLGIModel(LGI_Model):
 
         return fwd_dict
 
-    def shared_step(self, batch: HeteroDataBatch, decoys: HeteroDataBatch | None, stage: str, batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
-        fwd_dict = self.forward(batch, decoys)
+    def shared_step(self, batch: tuple[HeteroDataBatch, HeteroDataBatch | None] | HeteroDataBatch, stage: str, batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
+        if isinstance(batch, tuple):
+            batch, decoy = batch
+        else:
+            decoy = None
+        fwd_dict = self.forward(batch, decoy)
         fwd_dict["labels"] = batch["y"].float()
 
         inter_pred = sigmoid_cosine_distance_p(fwd_dict["glycan"], fwd_dict["lectin"])
         fwd_dict["preds"] = inter_pred
+        
+        if dataloader_idx == 0:
+            inter_loss = self.pred_loss(inter_pred, fwd_dict["labels"])
+            fwd_dict["inter_loss"] = inter_loss.float()
 
-        inter_loss = self.pred_loss(inter_pred, fwd_dict["labels"])
-        fwd_dict["inter_loss"] = inter_loss.float()
+            if decoy is not None:
+                embed_loss = self.embed_loss(fwd_dict["glycan"], fwd_dict["lectin"], fwd_dict["decoy"])
+                fwd_dict["embed_loss"] = embed_loss
+                loss = inter_loss + embed_loss # weighting factor?
+            else:
+                loss = inter_loss
+            fwd_dict["loss"] = loss.float()
 
-        if decoys is not None:
-            embed_loss = self.embed_loss(fwd_dict["glycan"], fwd_dict["lectin"], fwd_dict["decoy"])
-            fwd_dict["embed_loss"] = embed_loss
-            loss = inter_loss + embed_loss # weighting factor?
+            self.metrics[stage].update(inter_pred, fwd_dict["labels"])
+            self.log(f"{stage}/loss", fwd_dict["loss"], batch_size=len(fwd_dict["preds"]), add_dataloader_idx=False)
         else:
-            loss = inter_loss
-        fwd_dict["loss"] = loss.float()
-
-        self.metrics[stage].update(inter_pred, fwd_dict["labels"])
-        self.log(f"{stage}/loss", fwd_dict["loss"], batch_size=len(fwd_dict["preds"]))
+            name, task = self.add_tasks[dataloader_idx - 1]
+            if task == "classification":
+                # fwd_dict["preds"] = (fwd_dict["preds"] > THRESHOLD).float()
+                fwd_dict["loss"] = nn.BCEWithLogitsLoss()(fwd_dict["preds"], fwd_dict["labels"].float())
+                self.add_metrics[dataloader_idx - 1][stage].update(fwd_dict["preds"], fwd_dict["labels"])
+                self.log(f"{stage}/{name}/loss", fwd_dict["loss"], batch_size=len(fwd_dict["preds"]), add_dataloader_idx=False)
+            elif task == "regression":
+                pass
+            else:
+                raise ValueError(f"Task {task} is not supported")
         return fwd_dict
 
-    def training_step(self, batch: tuple[HeteroDataBatch, HeteroDataBatch | None], batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
-        """Compute the training step of the model"""
-        return self.shared_step(batch[0], batch[1], "train", batch_idx, dataloader_idx)
-
-    def validation_step(self, batch: tuple[HeteroDataBatch, HeteroDataBatch | None], batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
-        """Compute the validation step of the model"""
-        return self.shared_step(batch[0], batch[1], "val", batch_idx, dataloader_idx)
-
-    def test_step(self, batch: tuple[HeteroDataBatch, HeteroDataBatch | None], batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
-        """Compute the testing step of the model"""
-        return self.shared_step(batch[0], batch[1], "test", batch_idx, dataloader_idx)
-
-    def predict_step(self, batch: tuple[HeteroDataBatch, HeteroDataBatch | None], batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
-        fwd_dict = self.forward(batch, batch[1])
+    def predict_step(self, batch: tuple[HeteroDataBatch, HeteroDataBatch | None] | HeteroDataBatch, batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
+        fwd_dict = self.forward(batch)
+        if isinstance(batch, tuple):
+            batch = batch[0]
         fwd_dict["IUPAC"] = batch["IUPAC"]
         fwd_dict["seq"] = batch["aa_seq"]
         return fwd_dict
-
-    def shared_end(self, stage: Literal["train", "val", "test"]):
-        """
-        Compute the shared end of the model.
-
-        Args:
-            stage: The stage of the model
-        """
-        metrics = self.metrics[stage].compute()
-        self.log_dict(metrics)
-        self.metrics[stage].reset()
-
-    def on_train_epoch_end(self) -> None:
-        """Compute the end of the training epoch"""
-        self.shared_end("train")
-
-    def on_validation_epoch_end(self) -> None:
-        """Compute the end of the validation"""
-        self.shared_end("val")
-        self.lectin_embeddings.close()
-
-    def on_test_epoch_end(self) -> None:
-        """Compute the end of the testing"""
-        self.shared_end("test")
-
-    def configure_optimizers(self):
-        """Configure the optimizer and the learning rate scheduler of the model"""
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5),
-            "monitor": "val/loss",
-        }

@@ -98,8 +98,8 @@ class LGI_Model(LightningModule):
         else:
             name, task = self.add_tasks[dataloader_idx - 1]
             if task == "classification":
-                fwd_dict["preds"] = (fwd_dict["preds"] > THRESHOLD).float()
-                fwd_dict["loss"] = nn.BCELoss()(fwd_dict["preds"], fwd_dict["labels"].float())
+                # fwd_dict["preds"] = (fwd_dict["preds"] > THRESHOLD).float()
+                fwd_dict["loss"] = nn.BCEWithLogitsLoss()(fwd_dict["preds"], fwd_dict["labels"].float())
                 self.add_metrics[dataloader_idx - 1][stage].update(fwd_dict["preds"], fwd_dict["labels"])
                 self.log(f"{stage}/{name}/loss", fwd_dict["loss"], batch_size=len(fwd_dict["preds"]), add_dataloader_idx=False)
             elif task == "regression":
@@ -121,7 +121,7 @@ class LGI_Model(LightningModule):
         return self.shared_step(batch, "test", batch_idx, dataloader_idx)
 
     def predict_step(self, batch: HeteroData, batch_idx: int = 0, dataloader_idx: int = 0) -> dict[str, torch.Tensor]:
-        fwd_dict = self(batch)
+        fwd_dict = self(batch, "test", batch_idx, dataloader_idx)
         fwd_dict["IUPAC"] = batch["IUPAC"]
         fwd_dict["seq"] = batch["aa_seq"]
         return fwd_dict

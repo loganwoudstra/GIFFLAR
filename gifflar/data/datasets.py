@@ -313,7 +313,7 @@ class LGIDataset(DownstreamGDs):
             transform: Optional[Callable] = None,
             pre_transform: Optional[Callable] = None,
             force_reload: bool = False,
-            scheme: Schema = object,
+            schema: Schema = object,
             **dataset_args: dict[str, Any],
     ):
         """
@@ -328,7 +328,7 @@ class LGIDataset(DownstreamGDs):
             pre_transform: The pre-transform to apply to the data
             **dataset_args: Additional arguments to pass to the dataset
         """
-        super().__init__(root=root, filename=filename, split=split, hash_code=hash_code, schema=scheme, transform=transform,
+        super().__init__(root=root, filename=filename, split=split, hash_code=hash_code, schema=schema, transform=transform,
                          pre_transform=pre_transform, force_reload=force_reload, **dataset_args)
     
     def process(self) -> None:

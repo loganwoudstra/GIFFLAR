@@ -47,6 +47,8 @@ def contrastive_data(decoy_threshold: float = 0, max_num_decoys: int = 4, norm_p
 
     triplets = []
     for i, (aa_seq, mols) in tqdm(enumerate(data.items())):
+        if i == 1000:
+            break
         if len(mols[DECOY]) == 0 or len(mols[LIGAND]) == 0:
             continue
         for ligand, zRFU in mols[LIGAND].items():
@@ -61,7 +63,7 @@ def contrastive_data(decoy_threshold: float = 0, max_num_decoys: int = 4, norm_p
     for t in triplets:
         t[2] = min((t[2] - decoy_threshold) / scale_factor, 1)
 
-    with open("/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/contrastive_data.pkl", "wb") as f:
+    with open("/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/contrastive_data_small.pkl", "wb") as f:
         pickle.dump(triplets, f)
 
 
