@@ -18,3 +18,4 @@ lightning_logs/*
 *.pdf
 *.pkl
 experiments/results/pdbs/*
+job_output/*

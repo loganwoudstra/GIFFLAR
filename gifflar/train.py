@@ -170,6 +170,7 @@ def pretrain(**kwargs: Any) -> None:
         transform=transforms, pre_transform=get_pretransforms(**(kwargs.get("pre-transforms", None) or {})),
     )
     model = PretrainGGIN(tasks=task_list, pre_transform_args=kwargs["pre-transforms"], **kwargs["model"])
+    model.to("cuda")
 
     # set up the logger
     logger = CSVLogger(kwargs["logs_dir"],
@@ -177,7 +178,7 @@ def pretrain(**kwargs: Any) -> None:
     logger.log_hyperparams(kwargs)
 
     trainer = Trainer(
-        devices=[1],
+        devices=[0],
         callbacks=[
             ModelCheckpoint(save_top_k=-1),
             RichModelSummary(),
@@ -185,6 +186,7 @@ def pretrain(**kwargs: Any) -> None:
         ],
         max_epochs=kwargs["model"]["epochs"],
         logger=logger,
+        accelerator='gpu',
     )
     trainer.fit(model, datamodule)
 

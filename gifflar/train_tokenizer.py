@@ -11,11 +11,11 @@ def train_tokenizer(name_trainer, name_pre_tokenizer):
     print(f"Training {name_pre_tokenizer} tokenizer with {name_trainer}")
     TRAINER[name_trainer](
         PRE_TOKENIZERS[name_pre_tokenizer](),
-        corpus_path=f"/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/unique_iupacs_137000.pkl",
+        corpus_path=f"/home/lwoudstr/scratch/GIFFLAR/unique/unique_iupacs_137000.pkl",
         # corpus_path="/home/rjo21/Desktop/GIFFLAR/datasets/glycans_1000.txt",
         token_path=f"datasets/{name_pre_tokenizer}.txt",
         total_token=[2_500, 5_000, 7_500, 10_000],
-        save_format=f"/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/unique/GlyLM/{name_trainer}_{name_pre_tokenizer}_{{}}.pkl",
+        save_format=f"/home/lwoudstr/scratch/GIFFLAR/unique/GlyLM/{name_trainer}_{name_pre_tokenizer}_{{}}.pkl",
     ).train()
 
 

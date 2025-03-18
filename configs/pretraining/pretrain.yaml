@@ -1,6 +1,6 @@
 seed: 42
-file_path: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data_pret/expanded_glycans.txt
-logs_dir: /scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/logs_pret
+file_path: /home/lwoudstr/scratch/GIFFLAR/data_pret/expanded_glycans.txt
+logs_dir: /home/lwoudstr/scratch/GIFFLAR/logs_pret
 pre-transforms:
   GIFFLARTransform:
   GNNGLYTransform:

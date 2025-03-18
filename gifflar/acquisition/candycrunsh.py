@@ -5,7 +5,7 @@ from gifflar.data.utils import GlycanStorage
 with open("gifflar/acquisition/collected.pkl", "rb") as f:
     _, unique_glycans, _ = pickle.load(f)
 
-gs = GlycanStorage("/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/data")
+gs = GlycanStorage("/home/lwoudstr/scratch/GIFFLAR/data")
 print("Loaded GlycanStorage:", len(gs.data))
 
 data = {}

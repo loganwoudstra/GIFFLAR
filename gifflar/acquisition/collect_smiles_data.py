@@ -8,14 +8,14 @@ from gifflar.data.utils import GlycanStorage
 glycans_path = Path("subglycans.pkl")
 
 if not glycans_path.exists():
-    import gifflar.acauisition.collect_pretrain_data
+    import gifflar.acquisition.collect_pretrain_data
 
 print("Extracting SMILES data...\n=========================")
 
 with open(glycans_path, "rb") as f:
     iupacs = pickle.load(f)
 
-root = Path("/") / "scratch" / "SCRATCH_SAS" / "roman" / "Gothenburg" / "GIFFLAR" / "data_pret"
+root = Path("/") / "home" / "lwoudstr" / "scratch" / "GIFFLAR" / "data_pret"
 
 gs = GlycanStorage(root)
 data = []

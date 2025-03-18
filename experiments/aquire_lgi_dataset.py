@@ -63,9 +63,8 @@ def contrastive_data(decoy_threshold: float = 0, max_num_decoys: int = 4, norm_p
     for t in triplets:
         t[2] = min((t[2] - decoy_threshold) / scale_factor, 1)
 
-    with open("/scratch/SCRATCH_SAS/roman/Gothenburg/GIFFLAR/contrastive_data_small.pkl", "wb") as f:
+    with open("/home/lwoudstr/scratch/GIFFLAR/contrastive_data_small.pkl", "wb") as f:
         pickle.dump(triplets, f)
-
 
 if __name__ == '__main__':
     # classical_data()
