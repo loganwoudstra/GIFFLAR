@@ -165,12 +165,12 @@ def pretrain(**kwargs: Any) -> None:
         kwargs: The configuration for the training.
     """
     transforms, task_list = get_transforms(kwargs.get("transforms", []))
+    num_cpus = int(os.environ.get("SLURM_CPUS_PER_TASK"))
     datamodule = PretrainGDM(
         file_path=kwargs["file_path"], hash_code=kwargs["hash"], batch_size=kwargs["model"].get("batch_size", 1),
-        transform=transforms, pre_transform=get_pretransforms(**(kwargs.get("pre-transforms", None) or {})),
+        transform=transforms, pre_transform=get_pretransforms(**(kwargs.get("pre-transforms", None) or {})), num_workers=num_cpus,
     )
     model = PretrainGGIN(tasks=task_list, pre_transform_args=kwargs["pre-transforms"], **kwargs["model"])
-    model.to("cuda")
 
     # set up the logger
     logger = CSVLogger(kwargs["logs_dir"],
@@ -178,7 +178,8 @@ def pretrain(**kwargs: Any) -> None:
     logger.log_hyperparams(kwargs)
 
     trainer = Trainer(
-        devices=[0],
+        devices=-1, # use all available devices
+        strategy="ddp",
         callbacks=[
             ModelCheckpoint(save_top_k=-1),
             RichModelSummary(),

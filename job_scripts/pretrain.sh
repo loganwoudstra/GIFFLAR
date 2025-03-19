@@ -3,8 +3,8 @@
 #SBATCH --job-name=pretrain
 #SBATCH --time=12:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=16
+#SBATCH --gpus-per-node=4
 #SBATCH --mem=64G
 #SBATCH --output=job_output/%x/%j/out.txt
 #SBATCH --error=job_output/%x/%j/err.txt
