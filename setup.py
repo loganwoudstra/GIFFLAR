@@ -16,7 +16,7 @@ setup(
         "jsonargparse",
         "rich",
         "pytorch-lightning",
-        "pytest"
+        "pytest",
         "pyyaml",
         "networkx",
         "torchmetrics",
