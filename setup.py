@@ -12,7 +12,7 @@ setup(
         "numpy",
         "pandas",
         "glyles>=1.0.0",
-        "glycowork @ git+https://github.com/BojarLab/glycowork"
+        "glycowork @ git+https://github.com/BojarLab/glycowork",
         "jsonargparse",
         "rich",
         "pytorch-lightning",
