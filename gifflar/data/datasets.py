@@ -36,7 +36,7 @@ class GlycanOnDiskDataset(OnDiskDataset):
         self._db: Optional[Database] = None
         self._numel: Optional[int] = None
         super(OnDiskDataset, self).__init__(root, transform, pre_transform, pre_filter, log=log, force_reload=force_reload)
-        self.dataset_args = torch.load(Path(self.processed_paths[path_idx]).with_suffix(".pth"))
+        self.dataset_args = torch.load(Path(self.processed_paths[path_idx]).with_suffix(".pth"), weights_only=False)
 
     def _process(self):
         if self.force_reload:
